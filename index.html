@@ -1,0 +1,2680 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AX 심화교육 · 대시보드 데이터 연동</title>
+<style>
+/* 발표자료_디자인.css (기본교육 디자인 시스템) 내장 */
+
+:root {
+  --brand:        #C10933;   /* 포인트 색 — 여기만 바꾸면 전체 강조색이 바뀜 */
+  --brand-dark:   #8E0726;   /* 히어로 그라데이션용 진한 톤 */
+  --brand-light:  #e11d48;   /* 히어로 그라데이션용 밝은 톤 */
+  --accent:       #624BFF;   /* 보조 강조색 (선택) */
+  --ink:          #222222;   /* 본문 글자 */
+  --muted:        #555555;   /* 보조 글자 */
+  --soft-bg:      #F8F8F8;   /* 옅은 배경 */
+  --border:       #E0E0E0;   /* 테두리 */
+}
+
+/* --- 기본 & 프로젝터 가독성 -------------------------------------------------
+   rem 기준 글씨를 키우면 글자·여백·간격이 같은 비율로 커져 레이아웃이 안 깨짐.
+   교육장/회의실 프로젝터에서 잘 보이게 115.5%로 확대, 모바일은 100% 복귀. */
+html { font-size: 115.5%; }
+@media (max-width: 768px) { html { font-size: 100%; } }
+
+body {
+  /* Windows/Mac에 기본 내장된 글꼴만 사용 — 폰트를 인터넷에서 불러오지 않습니다 */
+  font-family: '맑은 고딕', 'Malgun Gothic', -apple-system, 'Apple SD Gothic Neo', sans-serif;
+  color: var(--ink);
+  line-height: 1.75;
+  scroll-behavior: smooth;
+  word-break: keep-all;        /* 한글 줄바꿈 자연스럽게 */
+  overflow-wrap: break-word;
+  margin: 0;
+}
+
+/* --- 레이아웃: 고정 사이드바 + 본문 (교재/스크롤형) ------------------------- */
+.nav-sidebar {
+  position: fixed; left: 0; top: 0; bottom: 0; width: 280px;
+  background: #fff; border-right: 1px solid var(--border);
+  padding: 40px 20px; z-index: 100; overflow-y: auto;
+}
+.main-content { margin-left: 280px; }
+.content-section {
+  padding: 80px 8%; max-width: 1280px; margin: 0 auto;
+  border-bottom: 1px solid var(--border);
+}
+
+/* --- 섹션 제목 -------------------------------------------------------------- */
+.section-header {
+  position: relative;
+  border-bottom: 2px solid var(--brand);
+  padding-bottom: 10px; margin-bottom: 40px;
+  font-size: 2.5rem; font-weight: 700; color: var(--brand);
+}
+
+/* --- 사이드바 아코디언 (PART 접기/펼치기) --------------------------------- */
+.part-header {
+  font-size: 14px; font-weight: 700; color: #444;
+  padding: 10px 12px; border-radius: 6px; margin-top: 12px;
+  background: #fff; border: 1px solid #f0f0f0;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; width: 100%; cursor: pointer; text-align: left;
+  transition: all .3s;
+}
+.part-header > span { flex: 1 1 auto; min-width: 0; }
+.part-header:hover { background: #f9f9f9; color: var(--brand); border-color: #e0e0e0; }
+.part-content {
+  transition: max-height .4s cubic-bezier(0,1,0,1), opacity .3s;
+  max-height: 1000px; opacity: 1; overflow: hidden;
+  padding-left: 8px; margin-top: 4px;
+}
+.part-content.collapsed { max-height: 0 !important; opacity: 0 !important; margin-top: 0 !important; }
+.part-header i.fa-chevron-down { flex-shrink: 0; transition: transform .3s ease; }
+.part-header.collapsed i.fa-chevron-down { transform: rotate(-90deg); }
+
+.curriculum-item {
+  padding: 12px 15px; border-radius: 8px; cursor: pointer; margin-bottom: 5px;
+  font-size: 15px; color: var(--muted); transition: all .3s;
+}
+.curriculum-item:hover { background: var(--soft-bg); color: var(--brand); }
+.curriculum-item.active { background: var(--brand); color: #fff; font-weight: 500; }
+
+/* --- 강조 박스 ------------------------------------------------------------- */
+.info-box {
+  background: var(--soft-bg); border-left: 5px solid var(--brand);
+  padding: 25px; margin: 20px 0; border-radius: 0 8px 8px 0;
+}
+
+/* --- 복사용 코드/프롬프트/인용 박스 (다크 톤) ------------------------------ */
+.prompt-box {
+  background: #2D2D2D; color: #E0E0E0; padding: 30px; border-radius: 12px;
+  position: relative; margin: 25px 0; font-family: 'Courier New', monospace;
+  box-shadow: 0 10px 20px rgba(0,0,0,.1); white-space: pre-wrap;
+}
+.prompt-label {
+  position: absolute; top: -12px; left: 20px;
+  background: var(--brand); color: #fff; padding: 2px 12px;
+  border-radius: 4px; font-size: 12px; font-weight: bold; font-family: '맑은 고딕','Malgun Gothic',sans-serif;
+}
+.prompt-copy {           /* JS가 자동 삽입하는 복사 버튼 */
+  position: absolute; top: 12px; right: 12px;
+  background: rgba(255,255,255,.12); color: #fff; border: none;
+  padding: 4px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;
+}
+.prompt-copy:hover { background: var(--brand); }
+
+/* --- 표 ------------------------------------------------------------------- */
+.table-custom { width: 100%; border-collapse: collapse; margin: 30px 0; }
+.table-custom th { background: #f4f4f4; border-top: 2px solid #333; padding: 15px; text-align: left; }
+.table-custom td { border-bottom: 1px solid var(--border); padding: 15px; vertical-align: top; }
+
+/* --- 화면 목업(스크린샷 대체) --------------------------------------------- */
+.ui-mockup { border: 1px solid var(--border); border-radius: 14px; overflow: hidden;
+  background: #fff; box-shadow: 0 8px 24px rgba(0,0,0,.06); }
+.ui-mockup-header { display: flex; align-items: center; gap: 6px;
+  padding: 9px 14px; background: #F3F4F6; border-bottom: 1px solid var(--border); }
+.dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+.dot-red { background: #FF5F57; } .dot-yellow { background: #FEBC2E; } .dot-green { background: #28C840; }
+
+/* --- 히어로(표지) --------------------------------------------------------- */
+.hero {
+  position: relative; overflow: hidden; padding: 110px 8% 90px; color: #fff;
+  background: linear-gradient(135deg, var(--brand-dark) 0%, var(--brand) 55%, var(--brand-light) 100%);
+}
+
+/* --- 스크롤 등장 애니메이션 & 카드 호버 ----------------------------------- */
+.reveal-init {
+  opacity: 0; transform: translateY(26px);
+  transition: opacity .6s cubic-bezier(.2,.6,.2,1), transform .6s cubic-bezier(.2,.6,.2,1);
+  will-change: opacity, transform;
+}
+.reveal-in { opacity: 1; transform: none; }
+.lift { transition: transform .25s ease, box-shadow .25s ease; }
+.lift:hover { transform: translateY(-5px); box-shadow: 0 14px 30px rgba(0,0,0,.1); }
+
+/* --- 상단 진행바 / 맨 위로 버튼 ------------------------------------------- */
+#read-progress { position: fixed; top: 0; left: 0; height: 4px; width: 0;
+  background: linear-gradient(90deg, var(--brand), var(--brand-light)); z-index: 200; }
+#to-top { position: fixed; right: 22px; bottom: 22px; width: 46px; height: 46px;
+  border-radius: 50%; border: none; background: var(--brand); color: #fff; cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0,0,0,.2); display: none; z-index: 200; }
+
+/* --- 반응형: 좁은 화면에선 사이드바 숨김 ---------------------------------- */
+@media (max-width: 1024px) {
+  .nav-sidebar { display: none; }
+  .main-content { margin-left: 0; }
+  .content-section { padding: 60px 20px; }
+}
+
+/* --- 접근성: 모션 최소화 선호 시 애니메이션 끄기 -------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .reveal-init { opacity: 1 !important; transform: none !important; transition: none !important; }
+  .lift { transition: none !important; }
+}
+
+/* =============================================================
+   기본 레이아웃 유틸리티 (Tailwind 없이 그리드/카드를 짤 때 사용)
+   외부 CDN 없이 이 파일 하나로 카드 그리드·간격·글자 크기를 만듭니다.
+   ============================================================= */
+.grid { display: grid; gap: 16px; }
+.grid-2 { grid-template-columns: repeat(2, 1fr); }
+.grid-3 { grid-template-columns: repeat(3, 1fr); }
+.grid-4 { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 768px) {
+  .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+}
+
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.gap-sm { gap: 8px; } .gap-md { gap: 16px; } .gap-lg { gap: 24px; }
+
+.card-box {
+  background: #fff; border: 1px solid var(--border); border-radius: 14px;
+  padding: 20px 22px; box-shadow: 0 4px 16px rgba(0,0,0,.04);
+}
+
+.badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--soft-bg); color: var(--brand);
+  font-size: 13px; font-weight: 700; padding: 4px 12px; border-radius: 999px;
+}
+
+.text-sm { font-size: .9rem; }
+.text-xs { font-size: .8rem; }
+.text-muted { color: var(--muted); }
+.mt-sm { margin-top: 8px; } .mt-md { margin-top: 16px; } .mt-lg { margin-top: 32px; }
+
+
+/* ---- 이 교재 전용 추가 스타일 ---- */
+.curriculum-item { display:block; text-decoration:none; }
+.part-tag { display:inline-block; font-size:.8rem; font-weight:700; color:#fff; background:var(--brand); padding:2px 10px; border-radius:4px; margin-bottom:10px; }
+.part-tag.demo { background:#1d4ed8; }
+.lead-text { font-size:1.12rem; color:#333; margin:-20px 0 28px; }
+h3.sub { font-size:1.35rem; margin:44px 0 14px; padding-left:12px; border-left:5px solid var(--brand); }
+.muted-note { font-size:.85rem; color:var(--muted); }
+
+/* 일정표 */
+.schedule { display:grid; grid-template-columns:150px 1fr 110px; border:1px solid var(--border); border-radius:14px; overflow:hidden; }
+.schedule > div { padding:16px 18px; border-bottom:1px solid var(--border); }
+.schedule .h { background:#f4f4f4; font-weight:700; font-size:.9rem; }
+.schedule .slot { font-weight:800; }
+.schedule .slot small { display:block; font-weight:400; color:var(--muted); }
+.schedule .break { grid-column:1/-1; background:var(--soft-bg); color:var(--muted); text-align:center; font-size:.9rem; padding:8px; }
+.schedule ul { margin:0; padding-left:18px; }
+.schedule .min { color:var(--muted); font-size:.85rem; }
+.new { display:inline-block; font-size:.7rem; font-weight:700; color:#fff; background:#0f766e; border-radius:4px; padding:0 6px; margin-left:4px; vertical-align:2px; }
+
+/* 다이어그램: 층/파이프라인 */
+.layers { display:grid; grid-template-columns:1fr auto 1fr auto 1fr; gap:10px; align-items:stretch; }
+.layer { border:2px solid var(--border); border-radius:16px; padding:20px; background:#fff; }
+.layer .icon { font-size:2rem; }
+.layer h4 { margin:6px 0 2px; font-size:1.15rem; }
+.layer .role { font-size:.85rem; color:var(--brand); font-weight:700; }
+.layer ul { padding-left:18px; margin:10px 0 0; font-size:.92rem; }
+.layer.front { border-color:#93c5fd; } .layer.back { border-color:#fca5a5; } .layer.data { border-color:#86efac; }
+.arrow { display:flex; align-items:center; justify-content:center; font-size:1.6rem; color:#9ca3af; }
+.pipe { display:flex; flex-wrap:wrap; gap:0; align-items:stretch; }
+.pipe .stage { flex:1 1 120px; background:#fff; border:1px solid var(--border); border-radius:12px; padding:14px; margin:6px; position:relative; }
+.pipe .stage .no { font-size:.75rem; font-weight:700; color:var(--muted); }
+.pipe .stage h4 { margin:2px 0 6px; font-size:1rem; }
+.pipe .stage p { margin:0; font-size:.85rem; color:#444; line-height:1.55; }
+.pipe .stage .who { margin-top:8px; font-size:.75rem; display:inline-block; padding:1px 8px; border-radius:999px; background:var(--soft-bg); color:var(--muted); }
+.pipe .stage.hl { border:2px solid var(--brand); }
+.pipe .stage.demo { border:2px dashed #1d4ed8; }
+.pipe.p6 .stage { flex-basis:92px; padding:12px 10px; margin:4px; } .pipe.p6 .stage h4 { font-size:.92rem; } .pipe.p6 .stage p { font-size:.78rem; }
+.zone-line { display:flex; gap:10px; flex-wrap:wrap; margin:6px 6px 0; font-size:.8rem; }
+.zone-line span { padding:2px 10px; border-radius:999px; }
+
+/* 비교·체크 카드 */
+.vs { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.vs > *, .grid > *, .layers > * { min-width:0; }
+.vs .bad { border-top:5px solid #9ca3af; } .vs .good { border-top:5px solid var(--brand); }
+.vs h4 { margin:0 0 8px; }
+.check { list-style:none; padding:0; margin:0; }
+.check li { padding:8px 0 8px 30px; position:relative; border-bottom:1px dashed var(--border); }
+.check li::before { content:'✔'; position:absolute; left:4px; color:var(--brand); font-weight:900; }
+.num-card { position:relative; padding-top:34px; }
+.num-card .n { position:absolute; top:-14px; left:20px; width:32px; height:32px; border-radius:50%; background:var(--brand); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; }
+.num-card h4 { margin:0 0 6px; }
+.num-card p { margin:0; font-size:.92rem; color:#444; }
+.flow-steps { counter-reset:s; display:grid; grid-template-columns:repeat(4,1fr); gap:24px 16px; margin-top:24px; }
+.flow-steps .card-box { position:relative; }
+.flow-steps .card-box.today { border:2px solid var(--brand); }
+.flow-steps .card-box.done { background:var(--soft-bg); }
+.flow-steps .tag { font-size:.72rem; font-weight:700; padding:1px 8px; border-radius:4px; }
+.tag.done { background:#e5e7eb; color:#555; } .tag.today { background:var(--brand); color:#fff; } .tag.next { background:#dbeafe; color:#1d4ed8; }
+
+/* 경고/팁 */
+.warn { padding:16px 20px; background:#FFF8E6; border:1px solid #F5D77E; border-radius:12px; color:#7a4a00; margin:20px 0; }
+.danger { padding:16px 20px; background:#FEF2F2; border:1px solid #FECACA; border-radius:12px; color:#991b1b; margin:20px 0; }
+.tipbox { padding:16px 20px; background:#EFF6FF; border:1px solid #BFDBFE; border-radius:12px; color:#1e3a8a; margin:20px 0; }
+
+/* 터미널·코드 */
+.term { background:#0d1117; color:#c9d1d9; border-radius:12px; padding:18px 22px; font-family:Consolas,'Courier New',monospace; font-size:.85rem; line-height:1.6; white-space:pre-wrap; overflow-x:auto; margin:16px 0; }
+.term .ok { color:#3fb950; } .term .ng { color:#f85149; } .term .dim { color:#8b949e; } .term .cmd { color:#79c0ff; }
+.code { background:#1e1e1e; color:#d4d4d4; border-radius:12px; padding:18px 22px; font-family:Consolas,'Courier New',monospace; font-size:.84rem; line-height:1.6; white-space:pre; overflow-x:auto; margin:12px 0; }
+.code .c { color:#6a9955; } .code .k { color:#569cd6; } .code .s { color:#ce9178; } .code .del { background:rgba(248,81,73,.18); display:block; } .code .add { background:rgba(63,185,80,.18); display:block; }
+.code-title { font-size:.8rem; font-weight:700; color:var(--muted); margin:18px 0 -6px; }
+.prompt-box { font-size:.9rem; line-height:1.7; }
+code.i { background:#f3f4f6; border:1px solid #e5e7eb; border-radius:4px; padding:0 5px; font-family:Consolas,monospace; font-size:.88em; }
+
+/* 개념 그림: 프로젝트 > 데이터세트 > 테이블 */
+.nest { border:2px solid #93c5fd; border-radius:14px; padding:14px 16px 16px; background:#f8fbff; }
+.nest .nest { border-color:#86efac; background:#f7fdf9; margin-top:10px; }
+.nest .nest .nest { border-color:#fca5a5; background:#fffafa; }
+.nest .lbl { font-weight:800; font-size:.95rem; }
+.nest .lbl small { font-weight:400; color:var(--muted); margin-left:6px; }
+
+/* 키 JSON 해부 */
+.keyjson { font-family:Consolas,monospace; font-size:.85rem; background:#fff; border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+.keyjson div { display:grid; grid-template-columns:minmax(150px,240px) 1fr; border-bottom:1px solid var(--border); }
+.keyjson div > * { padding:9px 14px; }
+.keyjson b { color:#1d4ed8; font-weight:400; }
+.keyjson span { font-family:'맑은 고딕','Malgun Gothic',sans-serif; color:#444; }
+.keyjson .secret b { color:var(--brand); font-weight:700; }
+.keyjson .secret { background:#fff5f5; }
+
+/* 시연 카드 */
+.demo-card { border:2px dashed #1d4ed8; background:#f8faff; border-radius:16px; padding:22px 24px; }
+.demo-card .badge { background:#1d4ed8; color:#fff; }
+.watch { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:14px; }
+.watch div { background:#fff; border:1px solid #c7d2fe; border-radius:10px; padding:12px 14px; font-size:.9rem; }
+.watch b { display:block; color:#1d4ed8; margin-bottom:4px; }
+
+/* FAQ */
+details.faq { border:1px solid var(--border); border-radius:12px; padding:0 18px; margin:10px 0; background:#fff; }
+details.faq summary { cursor:pointer; padding:16px 0; font-weight:700; list-style:none; }
+details.faq summary::before { content:'Q. '; color:var(--brand); }
+details.faq[open] summary { border-bottom:1px dashed var(--border); }
+details.faq > div { padding:12px 0 18px; color:#333; }
+
+.progress-bar { height:10px; background:#eee; border-radius:999px; overflow:hidden; margin:10px 0 4px; }
+.progress-bar div { height:100%; width:0; background:var(--brand); transition:width .3s; }
+
+.table-wrap { overflow-x:auto; }
+.table-custom td, .table-custom th { font-size:.92rem; }
+.table-custom .yes { color:#0f766e; font-weight:700; } .table-custom .no { color:var(--brand); font-weight:700; }
+.one-line { font-size:1.35rem; font-weight:800; text-align:center; padding:34px 20px; border-radius:16px; background:linear-gradient(135deg,var(--brand-dark),var(--brand)); color:#fff; line-height:1.6; }
+
+@media (max-width: 1024px) {
+  .layers { grid-template-columns:1fr; } .arrow { transform:rotate(90deg); }
+  .flow-steps { grid-template-columns:repeat(2,1fr); }
+  .schedule { grid-template-columns:110px 1fr; } .schedule .min, .schedule .h.minh { display:none; }
+  .watch { grid-template-columns:1fr; }
+}
+@media (max-width: 768px) {
+  .vs, .flow-steps { grid-template-columns:1fr; }
+  .hero h1 { font-size:1.9rem; }
+  .section-header { font-size:1.8rem; }
+  .keyjson div { grid-template-columns:1fr; }
+}
+
+/* =====================================================================
+   기본교육(AX_기본교육) 화면 디자인 요소 이식 — 외부 CDN 없이 재현
+   ===================================================================== */
+:root { color-scheme:light; }
+html, body { background:#fff; }
+body { font-family:'Noto Sans KR','맑은 고딕','Malgun Gothic',-apple-system,'Apple SD Gothic Neo',sans-serif; }
+.prompt-label, .prompt-copy { font-family:inherit; }
+
+/* 사이드바 상단 로고 영역 */
+.nav-brand { margin:0 0 30px 4px; }
+.brand { display:flex; align-items:center; gap:9px; }
+.brand-mark { width:36px; height:36px; border-radius:50%; background:var(--brand); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:14px; letter-spacing:-.5px; flex-shrink:0; }
+.brand-name { font-size:1.5rem; font-weight:800; color:#6b6b6b; letter-spacing:-.03em; line-height:1; }
+.brand-sub { font-size:12px; color:#9ca3af; margin:6px 0 0; }
+/* LG전자 로고 (기본교육과 같은 이미지 · h-8 / md:h-9 크기) */
+.nav-brand img.h-8 { height:2rem; width:auto; display:block; }
+@media (min-width:768px) { .nav-brand img.md\:h-9 { height:2.25rem; } }
+.brand-fallback { display:flex; align-items:center; gap:9px; }
+.brand-fallback[hidden] { display:none; }
+.part-header .chev { flex-shrink:0; transition:transform .3s ease; color:#666; }
+.part-header.collapsed .chev { transform:rotate(-90deg); }
+
+/* 표지 */
+.hero { padding:110px 8% 70px; }
+.hero::after { content:""; position:absolute; right:-120px; top:-120px; width:460px; height:460px;
+  background:radial-gradient(circle, rgba(255,255,255,.16) 0%, rgba(255,255,255,0) 70%); border-radius:50%;
+  animation:heroGlow 7s ease-in-out infinite alternate; }
+@keyframes heroGlow { from { transform:translate(0,0) scale(1); } to { transform:translate(-30px,30px) scale(1.15); } }
+.hero-inner { position:relative; z-index:2; }
+.hero-kicker { font-size:.85rem; font-weight:600; letter-spacing:.2em; color:rgba(255,255,255,.85); margin:0 0 16px; }
+.hero h1 { font-size:3.2rem; font-weight:700; line-height:1.25; letter-spacing:-.02em; margin:0; }
+.hero-lead { font-size:1.12rem; margin:20px 0 0; max-width:42rem; color:rgba(255,255,255,.92); }
+.hero-fade { opacity:0; transform:translateY(20px); animation:heroFade .8s cubic-bezier(.2,.6,.2,1) forwards; }
+@keyframes heroFade { to { opacity:1; transform:none; } }
+.hero-chips { display:flex; flex-wrap:wrap; gap:10px; margin-top:32px; }
+.hero-chip { display:inline-flex; align-items:center; gap:7px; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.28);
+  backdrop-filter:blur(4px); padding:8px 14px; border-radius:999px; font-size:13px; font-weight:500; color:#fff; text-decoration:none;
+  transition:background .25s ease, transform .25s ease; }
+.hero-chip:hover { background:rgba(255,255,255,.28); transform:translateY(-2px); }
+.hero-chip .cn { font-weight:800; }
+.hero-meta { display:flex; flex-wrap:wrap; align-items:center; gap:12px 24px; margin-top:36px; font-size:.9rem; color:rgba(255,255,255,.9); }
+.hero-cta { margin-left:auto; display:inline-flex; align-items:center; gap:8px; background:#fff; color:var(--brand); font-weight:700;
+  padding:12px 24px; border-radius:999px; text-decoration:none; box-shadow:0 10px 25px rgba(0,0,0,.18); transition:background .2s; }
+.hero-cta:hover { background:#f3f4f6; }
+.scroll-cue { text-align:center; margin-top:48px; color:rgba(255,255,255,.7); font-size:1.4rem; line-height:1; animation:bounce 1.8s ease-in-out infinite; }
+@keyframes bounce { 0%,100% { transform:translateY(0); } 50% { transform:translateY(8px); } }
+
+/* 진행바 · 맨 위로 · 복사 버튼 */
+#read-progress { height:3px; background:linear-gradient(90deg,#C10933,#f43f5e); transition:width .1s linear; }
+#to-top { display:block; right:28px; bottom:28px; box-shadow:0 8px 20px rgba(193,9,51,.35); opacity:0; pointer-events:none;
+  transform:translateY(12px); transition:opacity .3s ease, transform .3s ease, background .2s ease; z-index:150; font-size:18px; }
+#to-top.show { opacity:1; pointer-events:auto; transform:none; }
+#to-top:hover { background:#a10029; }
+.prompt-copy { top:10px; right:12px; color:#e0e0e0; border:1px solid rgba(255,255,255,.22); padding:4px 10px; transition:background .2s, color .2s; }
+.prompt-copy:hover { background:var(--brand); color:#fff; border-color:var(--brand); }
+.prompt-copy.copied { background:#16a34a; color:#fff; border-color:#16a34a; }
+
+/* 소제목: 아이콘 + 굵은 제목 (기본교육 h3 스타일) */
+h3.sub { border-left:none; padding-left:0; font-size:1.25rem; font-weight:700; display:flex; align-items:center; gap:10px; }
+h3.sub .ico { font-size:1.05em; }
+
+/* 회색 단계 박스 (기본교육 '대시보드 MVP 제작 4단계' 스타일) */
+.step-box { padding:24px; background:#F9FAFB; border-radius:8px; margin-bottom:28px; }
+.step-box h4 { font-weight:700; font-size:1.1rem; color:#b91c1c; margin:0 0 12px; }
+.step-box ol { padding-left:24px; margin:0; font-size:.92rem; color:#374151; }
+.step-box li + li { margin-top:12px; }
+.step-box .note { display:block; font-size:.78rem; color:#ef4444; font-weight:600; }
+
+/* 하이라이트 카드 (기본교육 bg-red-50 카드) */
+.vs .good { background:#FEF2F2; border:1px solid #FECACA; border-top:5px solid var(--brand); }
+
+/* 교시별 일정표 (기본교육 시간표 스타일) */
+.tt { margin-bottom:36px; padding:24px; background:#fff; border:2px solid var(--brand); border-radius:16px; box-shadow:0 1px 2px rgba(0,0,0,.05); }
+.tt-head { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:20px; }
+.tt-head h3 { font-weight:700; font-size:1.1rem; color:var(--brand); margin:0; }
+.tt-head span { font-size:.9rem; color:#6b7280; }
+.tt-row { display:flex; align-items:stretch; border:1px solid #e5e7eb; border-radius:12px; overflow:hidden; margin-bottom:8px; }
+.tt-when { width:96px; flex-shrink:0; background:#FEF2F2; text-align:center; display:flex; flex-direction:column; justify-content:center; padding:12px 8px; border-right:1px solid #e5e7eb; }
+.tt-when .n { font-size:1.15rem; font-weight:700; color:var(--brand); line-height:1; margin:0; }
+.tt-when .m { font-size:.75rem; color:#9ca3af; margin:6px 0 0; }
+.tt-body { flex:1; padding:16px; min-width:0; }
+.tt-tag { display:inline-block; padding:2px 8px; background:#FEE2E2; color:var(--brand); border-radius:4px; font-size:.75rem; font-weight:700; }
+.tt-tag.way { background:#F3F4F6; color:#6b7280; margin-left:4px; }
+.tt-title { font-weight:700; color:#1f2937; margin:8px 0 6px; }
+.tt-chips { display:flex; flex-wrap:wrap; gap:6px; font-size:.78rem; color:#6b7280; }
+.tt-chips span { padding:2px 8px; background:#F3F4F6; border-radius:4px; }
+.tt-chips span.add { background:#ECFDF5; color:#047857; font-weight:700; }
+.tt-row.hl { border:2px solid var(--brand); box-shadow:0 1px 2px rgba(0,0,0,.05); }
+.tt-row.hl .tt-when { background:var(--brand); border-right:none; }
+.tt-row.hl .tt-when .n { color:#fff; } .tt-row.hl .tt-when .m { color:#fecdd3; }
+.tt-row.hl .tt-tag:not(.way) { background:var(--brand); color:#fff; }
+.tt-row.hl .tt-chips span { background:#FEF2F2; border:1px solid #FEE2E2; color:#4b5563; }
+.tt-break { text-align:center; font-size:.78rem; color:#d97706; margin:6px 0; }
+
+@media (max-width:1024px) { .hero { padding:70px 24px 50px; } .hero h1 { font-size:2.2rem; } .hero-cta { margin-left:0; } }
+@media (max-width:768px) { .tt { padding:16px; } .tt-when { width:76px; } }
+@media (prefers-reduced-motion: reduce) { .hero-fade { opacity:1; transform:none; animation:none; } .hero::after, .scroll-cue { animation:none; } }
+
+
+/* ===== FIG: 3층 구조 애니메이션 (1-2) ===== */
+.fx { border:1px solid var(--border); border-radius:16px; background:#fff; box-shadow:0 8px 24px rgba(0,0,0,.05); overflow:hidden; margin:8px 0 14px; }
+.fx-top { display:flex; flex-wrap:wrap; align-items:center; gap:10px 14px; padding:14px 18px; background:#F9FAFB; border-bottom:1px solid var(--border); }
+.fx-fig { font-size:.72rem; font-weight:800; letter-spacing:.08em; color:#fff; background:#333; padding:2px 8px; border-radius:4px; }
+.fx-title { font-weight:700; }
+.fx-modes { margin-left:auto; display:flex; flex-wrap:wrap; gap:6px; }
+.fx-modes button { font:inherit; font-size:.82rem; padding:6px 13px; border-radius:999px; border:1px solid var(--border); background:#fff; cursor:pointer; color:#444; transition:all .2s; }
+.fx-modes button:hover { border-color:var(--brand); color:var(--brand); }
+.fx-modes button.on { background:var(--brand); border-color:var(--brand); color:#fff; font-weight:700; }
+.fx-modes button[data-mode="direct"].on { background:#374151; border-color:#374151; }
+.fx-stage { position:relative; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:60px; padding:26px 22px 28px; transition:padding .3s; }
+.fx.direct .fx-stage { padding-bottom:84px; }
+.fx-node { position:relative; border:2px solid var(--border); border-radius:14px; padding:14px; background:#fff; display:flex; flex-direction:column; gap:10px; min-width:0;
+  transition:border-color .3s, box-shadow .3s, opacity .3s, transform .3s; }
+.fx-node[data-n="front"] { border-color:#BFDBFE; } .fx-node[data-n="back"] { border-color:#FECACA; } .fx-node[data-n="data"] { border-color:#BBF7D0; }
+.fx-node.act { border-color:var(--brand); box-shadow:0 0 0 5px rgba(193,9,51,.12); transform:translateY(-3px); }
+.fx-node.dim { opacity:.4; }
+.fx-nh { display:flex; gap:10px; align-items:center; }
+.fx-ic { font-size:1.8rem; line-height:1; }
+.fx-nh small { display:block; font-size:.72rem; color:var(--brand); font-weight:700; line-height:1.3; }
+.fx-nh b { font-size:1rem; line-height:1.3; }
+.fx-role { font-size:.78rem; color:var(--muted); margin:-4px 0 0; line-height:1.5; }
+.fx-has { display:flex; flex-wrap:wrap; gap:5px; margin-top:auto; padding-top:4px; }
+.fx-has > span[hidden] { display:none; }
+.fx-chip { font-size:.72rem; padding:2px 9px; border-radius:999px; background:#F3F4F6; color:#4b5563; border:1px solid #e5e7eb; transition:all .3s; white-space:nowrap; }
+.fx-chip.key { background:#FEF3C7; color:#92400E; border-color:#FCD34D; }
+.fx-chip.bad { background:#FEE2E2; color:#991B1B; border-color:#FCA5A5; }
+.fx-chip.good { background:#ECFDF5; color:#047857; border-color:#A7F3D0; }
+.fx-chip.pulse { animation:fxPulse .9s ease 2; }
+@keyframes fxPulse { 50% { transform:scale(1.14); box-shadow:0 0 0 5px rgba(245,158,11,.25); } }
+/* 프론트: 미니 대시보드 */
+.fx-kpis { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.fx-kpis div { background:#F9FAFB; border-radius:8px; padding:5px 8px; }
+.fx-kpis small { display:block; font-size:.66rem; color:var(--muted); line-height:1.3; }
+.fx-kpis b { font-size:1.05rem; font-variant-numeric:tabular-nums; line-height:1.3; }
+.fx-kpis b.flash { animation:fxFlash .6s ease; }
+@keyframes fxFlash { 50% { color:var(--brand); } }
+.fx-bars { display:flex; align-items:flex-end; gap:5px; height:52px; padding:0 2px; border-bottom:1px solid #e5e7eb; }
+.fx-bars i { flex:1; height:0; background:#9ca3af; border-radius:3px 3px 0 0; transition:height .8s cubic-bezier(.2,.7,.2,1); }
+.fx-bars i.low { background:var(--brand); }
+.fx-code { display:none; font-family:Consolas,monospace; font-size:.68rem; background:#FEF2F2; color:#991B1B; border:1px dashed #FCA5A5; border-radius:6px; padding:5px 8px; word-break:break-all; line-height:1.45; }
+.fx.direct .fx-code { display:block; }
+/* 백엔드: 서버 로그 */
+.fx-log { font-family:Consolas,monospace; font-size:.7rem; background:#111827; color:#d1d5db; border-radius:8px; padding:8px 10px; height:118px; overflow:hidden; line-height:1.6; display:flex; flex-direction:column; justify-content:flex-end; }
+.fx-log div { animation:fxIn .3s ease; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.fx-log .ok { color:#86efac; } .fx-log .ng { color:#fca5a5; } .fx-log .dim { color:#9ca3af; } .fx-log .y { color:#fcd34d; }
+@keyframes fxIn { from { opacity:0; transform:translateY(4px); } }
+.fx-none { display:none; position:absolute; inset:0; z-index:2; border-radius:12px; flex-direction:column; align-items:center; justify-content:center; gap:4px;
+  background:repeating-linear-gradient(45deg,#fafafa,#fafafa 10px,#f3f4f6 10px,#f3f4f6 20px); color:#6b7280; font-weight:700; text-align:center; font-size:.9rem; }
+.fx-none span { font-size:1.8rem; }
+.fx.direct .fx-node[data-n="back"] { border-style:dashed; border-color:#d1d5db; }
+.fx.direct .fx-none { display:flex; }
+/* 저장소: 테이블 격자 */
+.fx-grid { display:grid; grid-template-columns:repeat(9,1fr); gap:2px; }
+.fx-grid i { height:9px; background:#DCFCE7; border-radius:2px; transition:background .25s; }
+.fx-grid i.hit { background:#16a34a; }
+.fx-grid i.skip { background:#F0FDF4; }
+.fx-count { font-size:.76rem; color:var(--muted); line-height:1.5; }
+.fx-count b { color:var(--ink); font-variant-numeric:tabular-nums; }
+.fx-zz { display:none; position:absolute; right:10px; top:10px; font-size:.75rem; font-weight:700; background:#EFF6FF; color:#1d4ed8; border-radius:999px; padding:2px 10px; }
+.fx-node.sleep .fx-zz { display:block; }
+/* 이동하는 꾸러미 */
+.fx-packet { position:absolute; left:0; top:0; z-index:5; pointer-events:none; white-space:nowrap; font-size:.76rem; font-weight:700; padding:6px 12px;
+  border-radius:999px; color:#fff; background:#1d4ed8; box-shadow:0 8px 18px rgba(0,0,0,.22); opacity:0; }
+.fx-packet.req { background:#1d4ed8; } .fx-packet.sql { background:#92400E; } .fx-packet.res { background:#047857; }
+.fx-packet.raw { background:#991B1B; font-size:.9rem; padding:12px 18px; border-radius:10px; }
+.fx-packet.key { background:#F59E0B; color:#111; }
+.fx-thief { position:absolute; left:22px; bottom:16px; display:flex; align-items:center; gap:8px; padding:8px 14px; border-radius:12px;
+  background:#111827; color:#fff; font-size:.82rem; box-shadow:0 8px 18px rgba(0,0,0,.2); }
+.fx-thief[hidden] { display:none; }
+.fx-thief b { color:#FCD34D; }
+/* 설명 · 조작 */
+.fx-cap { display:flex; gap:12px; align-items:flex-start; padding:14px 20px; border-top:1px solid var(--border); background:#FFFBEB; min-height:80px; }
+.fx-no { flex-shrink:0; font-weight:800; color:#fff; background:var(--brand); border-radius:999px; padding:1px 10px; font-size:.8rem; margin-top:3px; font-variant-numeric:tabular-nums; }
+.fx-cap p { margin:0; color:#5b3b00; font-size:.98rem; }
+.fx-ctrl { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:12px 20px; border-top:1px solid var(--border); }
+.fx-ctrl button { font:inherit; font-size:.86rem; padding:7px 15px; border-radius:8px; border:1px solid var(--border); background:#fff; cursor:pointer; }
+.fx-ctrl button.primary { background:var(--brand); color:#fff; border-color:var(--brand); font-weight:700; }
+.fx-ctrl button:disabled { opacity:.45; cursor:default; }
+.fx-dots { margin-left:auto; display:flex; gap:6px; }
+.fx-dots i { width:9px; height:9px; border-radius:50%; background:#e5e7eb; transition:background .3s; }
+.fx-dots i.on { background:var(--brand); }
+@media (max-width:900px) { .fx-stage { grid-template-columns:1fr; gap:50px; } .fx-modes { margin-left:0; } .fx.direct .fx-stage { padding-bottom:90px; } }
+
+
+/* ===== FIG 1: 고정형 vs 연동형 (1-1) ===== */
+.ph-wh { display:flex; flex-wrap:wrap; align-items:center; gap:6px 14px; margin:18px 22px 0; padding:12px 16px; border-radius:12px; background:#F0FDF4; border:1px solid #BBF7D0; font-size:.92rem; }
+.ph-wh b { font-variant-numeric:tabular-nums; }
+.ph-new { background:#16a34a; color:#fff; font-size:.75rem; font-weight:700; padding:2px 10px; border-radius:999px; animation:fxIn .4s ease; }
+.ph-new[hidden] { display:none; }
+.ph-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; padding:16px 22px 22px; }
+.ph-card { border:2px solid var(--border); border-radius:14px; padding:16px; background:#fff; transition:border-color .3s, background .3s; min-width:0; }
+.ph-card.window { border-color:#93C5FD; }
+.ph-card.stale { border-color:#FCA5A5; background:#FFFBFB; }
+.ph-card.stale .ph-kpi { filter:grayscale(.7); opacity:.8; }
+.ph-h { font-weight:700; margin-bottom:10px; display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; }
+.ph-h small { font-weight:400; color:var(--muted); font-size:.78rem; }
+.ph-kpi { display:grid; grid-template-columns:1fr 1fr; gap:8px; transition:filter .4s, opacity .4s; }
+.ph-kpi div { background:#F9FAFB; border-radius:8px; padding:8px 10px; }
+.ph-kpi small { display:block; font-size:.72rem; color:var(--muted); }
+.ph-kpi b { font-size:1.35rem; font-variant-numeric:tabular-nums; }
+.ph-stamp { margin-top:10px; display:inline-block; font-size:.78rem; font-weight:700; padding:3px 10px; border-radius:999px; background:#ECFDF5; color:#047857; }
+.ph-stamp.old { background:#FEE2E2; color:#991B1B; }
+.ph-stamp.loading { background:#EFF6FF; color:#1d4ed8; }
+.ph-foot { margin-top:8px; font-size:.78rem; color:var(--muted); }
+.flash-g { animation:fxFlashG .8s ease; }
+@keyframes fxFlashG { 40% { color:#16a34a; transform:scale(1.06); } }
+
+/* ===== FIG 3: 파이프라인 (1-4) ===== */
+.pp-stages { padding:14px 16px 0; }
+.pp-stages .stage { transition:opacity .3s, transform .3s, border-color .3s, box-shadow .3s; }
+#fx-pipe.running .pp-stages .stage { opacity:.4; }
+#fx-pipe.running .pp-stages .stage.past { opacity:.75; }
+#fx-pipe .pp-stages .stage.on { opacity:1; border:2px solid var(--brand); box-shadow:0 0 0 5px rgba(193,9,51,.12); transform:translateY(-3px); }
+.pp-view { margin:12px 22px 20px; min-height:200px; border:1px dashed #d1d5db; border-radius:14px; padding:16px; background:#FCFCFD; position:relative; overflow:hidden; }
+.pp-label { font-size:.75rem; font-weight:800; color:var(--muted); letter-spacing:.04em; margin-bottom:10px; }
+.pp-scene { animation:fxIn .35s ease; }
+.pp-wrap { overflow-x:auto; }
+.pp-table { border-collapse:collapse; font-size:.78rem; width:auto; }
+.pp-table th, .pp-table td { padding:6px 10px; border-bottom:1px solid #eee; text-align:left; white-space:nowrap; transition:padding .9s ease, opacity .6s ease, background .3s; }
+.pp-table th > div, .pp-table td > div { max-width:220px; overflow:hidden; transition:max-width .9s ease; }
+.pp-table th { background:#F3F4F6; font-weight:700; }
+.pp-table .pii { background:#FEF2F2; color:#991B1B; }
+.pp-table th.pii > div::before { content:'🔴 '; }
+.pp-table .pii.cut { text-decoration:line-through; }
+.pp-table .pii.gone { padding-left:0; padding-right:0; opacity:0; }
+.pp-table .pii.gone > div { max-width:0; }
+.pp-badges { display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
+.pp-row { display:flex; flex-wrap:wrap; gap:24px; align-items:flex-end; }
+.pp-stack { display:flex; flex-direction:column-reverse; gap:2px; height:110px; width:min(300px,100%); overflow:hidden; border-bottom:2px solid #16a34a; }
+.pp-stack i { height:3px; background:#86efac; border-radius:2px; flex-shrink:0; animation:fxIn .2s ease; }
+.pp-big { font-size:1.7rem; font-weight:800; font-variant-numeric:tabular-nums; line-height:1.2; }
+.pp-big small { font-size:.85rem; font-weight:500; color:var(--muted); margin-left:4px; }
+.pp-nums { display:flex; flex-wrap:wrap; gap:6px; max-width:560px; }
+.pp-nums span { background:#ECFDF5; border:1px solid #A7F3D0; color:#065F46; border-radius:8px; padding:4px 10px; font-size:.82rem; font-weight:700; animation:ppPop .35s cubic-bezier(.3,1.6,.6,1) both; }
+.pp-arrow { font-size:1.6rem; color:#9ca3af; align-self:center; }
+.pp-mini { width:min(380px,100%); display:flex; flex-direction:column; gap:8px; }
+@keyframes ppPop { from { opacity:0; transform:scale(.6); } }
+
+/* ===== FIG 4: NPS 분모 (1-6) ===== */
+.nps-body { padding:20px 22px 10px; }
+.nps-bar { display:flex; height:46px; border-radius:10px; overflow:hidden; font-size:.8rem; font-weight:700; color:#fff; }
+.nps-bar > div { display:flex; align-items:center; justify-content:center; white-space:nowrap; overflow:hidden; transition:box-shadow .3s; }
+.nps-bar .p { background:#16a34a; } .nps-bar .n { background:#9ca3af; } .nps-bar .d { background:#dc2626; }
+.nps-bar .x { background:repeating-linear-gradient(45deg,#fde68a,#fde68a 5px,#f59e0b 5px,#f59e0b 10px); }
+#fx-nps.all .nps-bar .x { box-shadow:inset 0 0 0 3px var(--brand); animation:fxPulse .9s ease 2; }
+.nps-legend { display:flex; flex-wrap:wrap; gap:6px 16px; font-size:.82rem; color:#4b5563; margin-top:10px; }
+.nps-legend i { display:inline-block; width:11px; height:11px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
+.nps-den { position:relative; height:34px; margin-top:6px; }
+.nps-den .br { position:absolute; left:0; top:0; height:12px; border:2px solid var(--brand); border-top:none; border-radius:0 0 6px 6px; transition:width .7s cubic-bezier(.3,.8,.3,1); }
+.nps-den .lb { position:absolute; top:14px; font-size:.8rem; font-weight:700; color:var(--brand); white-space:nowrap; transform:translateX(-50%); transition:left .7s cubic-bezier(.3,.8,.3,1); }
+.nps-formula { display:flex; flex-wrap:wrap; align-items:center; gap:8px; font-size:1.05rem; margin:10px 0 4px; padding:14px 16px; background:#F9FAFB; border-radius:12px; }
+.nps-formula .t { padding:2px 9px; border-radius:6px; font-weight:700; font-variant-numeric:tabular-nums; }
+.nps-formula .t.p { background:#DCFCE7; color:#166534; } .nps-formula .t.d { background:#FEE2E2; color:#991B1B; }
+.nps-formula .t.den { background:#FEF3C7; color:#92400E; transition:background .3s; }
+.nps-res { font-size:2rem; font-weight:900; color:var(--brand); font-variant-numeric:tabular-nums; margin-left:4px; }
+#fx-nps.all .nps-res { color:#6b7280; }
+
+@media (max-width:700px) { .ph-grid { grid-template-columns:1fr; } .pp-arrow { transform:rotate(90deg); } }
+
+
+/* ===== 1-4 API · DB to DB 연동 ===== */
+.concept3 .card-box h4 { margin:6px 0 6px; }
+.concept3 .big { font-size:1.8rem; line-height:1; }
+.menu-analogy { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:14px; }
+.menu-analogy div { background:#FFFBEB; border:1px solid #FDE68A; border-radius:12px; padding:12px 14px; font-size:.88rem; }
+.menu-analogy b { display:block; color:#92400E; margin-bottom:2px; }
+/* FIG 3 · API 시뮬레이터 */
+.api-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:16px; padding:18px 22px 6px; }
+.api-box { border:1px solid var(--border); border-radius:14px; padding:14px 16px; background:#fff; min-width:0; }
+.api-h { font-weight:800; font-size:.9rem; margin-bottom:10px; }
+.api-form { display:grid; grid-template-columns:auto 1fr; gap:8px 12px; align-items:center; font-size:.86rem; }
+.api-form .k { color:var(--muted); font-weight:700; font-size:.78rem; }
+.api-form select { font:inherit; padding:3px 6px; border-radius:6px; border:1px solid var(--border); }
+.api-m { display:inline-block; background:#1d4ed8; color:#fff; font-weight:800; font-size:.75rem; padding:1px 8px; border-radius:4px; font-family:Consolas,monospace; }
+.api-auth button { font:inherit; font-size:.8rem; padding:3px 10px; border-radius:999px; border:1px solid var(--border); background:#fff; cursor:pointer; }
+.api-auth button.on { background:#F59E0B; border-color:#F59E0B; color:#111; font-weight:700; }
+.api-auth button[data-auth="off"].on { background:#6b7280; border-color:#6b7280; color:#fff; }
+.api-wire, .api-body { font-family:Consolas,'Courier New',monospace; font-size:.76rem; line-height:1.6; background:#0d1117; color:#c9d1d9; border-radius:10px; padding:10px 12px; margin:12px 0 0; white-space:pre-wrap; word-break:break-all; min-height:84px; }
+.api-body { min-height:170px; max-height:260px; overflow:auto; }
+.api-wire .m { color:#79c0ff; font-weight:700; } .api-wire .q { color:#ffa657; } .api-wire .h { color:#8b949e; } .api-wire .tok { color:#fcd34d; }
+.api-body .k { color:#79c0ff; } .api-body .v { color:#a5d6ff; } .api-body .n { color:#ffa657; }
+.api-send { margin-top:12px; width:100%; font:inherit; font-weight:700; padding:9px; border-radius:10px; border:none; background:var(--brand); color:#fff; cursor:pointer; }
+.api-send:disabled { opacity:.5; cursor:default; }
+.api-flow { display:flex; gap:6px; flex-wrap:wrap; padding:6px 22px 0; }
+.api-flow span { flex:1 1 140px; text-align:center; font-size:.8rem; font-weight:700; padding:6px 8px; border-radius:999px; background:#F3F4F6; color:#9ca3af; transition:all .25s; }
+.api-flow span.on { background:#1d4ed8; color:#fff; }
+.api-flow span.done { background:#DBEAFE; color:#1d4ed8; }
+.api-status { display:inline-block; font-family:Consolas,monospace; font-weight:800; font-size:.85rem; padding:3px 12px; border-radius:999px; background:#F3F4F6; color:#6b7280; }
+.api-status.ok { background:#DCFCE7; color:#166534; } .api-status.ng { background:#FEE2E2; color:#991B1B; }
+.api-meta { font-size:.76rem; color:var(--muted); margin-left:8px; }
+.api-kpis { margin-top:10px; }
+.api-note { font-size:.8rem; color:var(--muted); padding:0 22px 12px; margin:6px 0 0; }
+/* 요청 5요소 */
+.parts5 { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; }
+.parts5 .card-box { padding:14px; }
+.parts5 b { display:block; margin-bottom:4px; }
+.parts5 code { font-size:.75rem; }
+/* 명세서 */
+.spec { border:2px solid #1d4ed8; border-radius:14px; overflow:hidden; }
+.spec-h { background:#1d4ed8; color:#fff; padding:10px 16px; font-weight:700; display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px; }
+.spec-h small { font-weight:400; opacity:.85; }
+.spec table { width:100%; border-collapse:collapse; font-size:.86rem; }
+.spec td { padding:9px 14px; border-bottom:1px solid #E5E7EB; vertical-align:top; }
+.spec td:first-child { width:24%; font-weight:700; color:#1e3a8a; background:#F8FAFF; white-space:nowrap; }
+/* DB to DB 그림 */
+.d2d { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:14px 0; }
+.d2d .db { flex:1 1 150px; border:2px solid var(--border); border-radius:14px; padding:12px 14px; background:#fff; text-align:center; }
+.d2d .db b { display:block; } .d2d .db small { color:var(--muted); font-size:.78rem; }
+.d2d .pipe-arrow { flex:1 1 170px; text-align:center; font-size:.78rem; font-weight:700; color:#92400E; position:relative; padding:14px 4px 4px; }
+.d2d .pipe-arrow::before { content:''; position:absolute; left:4px; right:14px; top:6px; height:4px; border-radius:2px;
+  background:repeating-linear-gradient(90deg,#F59E0B 0 10px,transparent 10px 16px); background-size:32px 4px; animation:d2dFlow 1.2s linear infinite; }
+.d2d .pipe-arrow::after { content:'▶'; position:absolute; right:0; top:-3px; color:#F59E0B; font-size:.9rem; }
+@keyframes d2dFlow { to { background-position:32px 0; } }
+/* 오늘 구조 = 조합 */
+.combo { display:flex; flex-wrap:wrap; align-items:stretch; gap:0; border:1px solid var(--border); border-radius:14px; overflow:hidden; }
+.combo > div { flex:1 1 130px; padding:12px 14px; font-size:.86rem; text-align:center; background:#fff; border-right:1px solid var(--border); }
+.combo > div:last-child { border-right:none; }
+.combo .lane { flex:1 1 150px; font-weight:800; font-size:.78rem; display:flex; align-items:center; justify-content:center; }
+.combo .lane.d { background:#FFFBEB; color:#92400E; } .combo .lane.a { background:#EFF6FF; color:#1d4ed8; }
+/* FIG 4 · 상황 카드 */
+.cases { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; padding:18px 22px 18px; }
+.case { position:relative; border:1px solid var(--border); border-radius:14px; padding:14px 16px; background:#fff; cursor:pointer; text-align:left; font:inherit; color:inherit; transition:border-color .2s, box-shadow .2s; }
+.case:hover { border-color:var(--brand); box-shadow:0 6px 16px rgba(0,0,0,.06); }
+.case .q { font-weight:700; }
+.case .hint { font-size:.78rem; color:var(--brand); font-weight:700; margin-top:8px; display:block; }
+.case .ans { display:grid; grid-template-rows:0fr; transition:grid-template-rows .4s ease; }
+.case .ans > .in { overflow:hidden; display:block; }
+.case.open .ans { grid-template-rows:1fr; }
+.case.open .hint { display:none; }
+.case .ans .p { display:block; margin:8px 0 0; font-size:.86rem; color:#374151; }
+.case .q, .case .tag { display:block; width:fit-content; }
+.case .tag { display:inline-block; margin-top:8px; font-size:.78rem; font-weight:800; padding:2px 10px; border-radius:999px; }
+.tag.api { background:#DBEAFE; color:#1d4ed8; } .tag.d2d { background:#FEF3C7; color:#92400E; } .tag.both { background:#FCE7F3; color:#9D174D; }
+/* 1-4 개인정보 안내 · 반응형 */
+.privacy-box { margin:20px 0; border:2px solid #FCA5A5; background:#FEF2F2; border-radius:14px; padding:18px 20px; }
+.privacy-box h4 { margin:0 0 10px; color:#991B1B; font-size:1.05rem; }
+.privacy-flow { display:flex; flex-wrap:wrap; align-items:stretch; gap:8px; }
+.privacy-flow > div { flex:1 1 170px; background:#fff; border:1px solid #FECACA; border-radius:10px; padding:10px 12px; font-size:.88rem; }
+.privacy-flow > div b { display:block; color:#991B1B; }
+.privacy-flow > .ar { flex:0 0 auto; display:flex; align-items:center; background:none; border:none; padding:0 2px; color:#F87171; font-size:1.2rem; }
+.privacy-box p { margin:10px 0 0; font-size:.88rem; color:#7f1d1d; }
+@media (max-width:1100px) { .parts5 { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+@media (max-width:900px) { .api-grid, .cases { grid-template-columns:1fr; } .menu-analogy { grid-template-columns:repeat(2,minmax(0,1fr)); } .parts5 { grid-template-columns:repeat(2,minmax(0,1fr)); } .privacy-flow > .ar { transform:rotate(90deg); justify-content:center; width:100%; } }
+
+
+/* ===== EAP · DBeaver 화면 목업 ===== */
+.prep-box { margin:22px 0 0; border:2px solid #1d4ed8; border-radius:14px; background:#F8FAFF; padding:18px 20px; }
+.prep-box h4 { margin:0 0 10px; color:#1d4ed8; }
+.prep-box ol { margin:0; padding-left:22px; } .prep-box li + li { margin-top:6px; }
+.eap-mock .eap-top { display:flex; align-items:baseline; gap:10px; padding:10px 16px; border-bottom:1px solid var(--border); }
+.eap-mock .eap-logo { font-weight:900; font-size:1.05rem; letter-spacing:.02em; }
+.eap-mock .eap-logo small { display:block; font-weight:400; font-size:.62rem; color:#555; letter-spacing:0; }
+.eap-mock .eap-logo b { color:var(--brand); }
+.eap-mock .eap-menu { display:flex; flex-wrap:wrap; gap:4px 14px; font-size:.78rem; color:#333; margin-left:auto; }
+.eap-mock .eap-menu span.on { color:var(--brand); font-weight:800; border-bottom:2px solid var(--brand); }
+.eap-body { padding:12px 16px 16px; font-size:.8rem; }
+.eap-title { font-weight:800; font-size:.95rem; padding-bottom:6px; border-bottom:2px solid var(--brand); margin-bottom:10px; }
+.eap-steps { display:flex; align-items:center; gap:6px; margin:0 0 12px; }
+.eap-steps span { flex:0 0 auto; border:1.5px solid #d1d5db; border-radius:8px; padding:3px 10px; font-size:.72rem; color:#9ca3af; background:#fff; }
+.eap-steps span.on { border-color:var(--brand); color:#111; font-weight:800; }
+.eap-steps i { flex:1; height:1px; background:#d1d5db; min-width:12px; }
+.eap-panel { background:#F7F7F8; border:1px solid #e5e7eb; border-radius:8px; padding:8px 12px; margin-bottom:8px; }
+.eap-wrap { display:grid; grid-template-columns:minmax(0,1fr); gap:18px; }
+.eap-wrap .eap-mock { max-width:820px; }
+.eap-row { display:grid; grid-template-columns:104px 1fr; gap:10px; align-items:center; padding:6px 0; }
+.eap-row.two { grid-template-columns:104px 1fr 84px 1fr; }
+.eap-row .l { color:#6b7280; font-size:.74rem; position:relative; }
+.eap-row .v { color:#111; min-width:0; }
+.eap-row .ok { color:#0891b2; font-weight:700; }
+.eap-in { display:inline-block; background:#fff; border:1px solid #d1d5db; border-radius:5px; padding:2px 8px; min-width:70px; }
+.eap-in.sel::after { content:' ⌄'; color:#6b7280; }
+.eap-in.wide { display:block; min-height:30px; }
+.eap-radio::before { content:'◉ '; color:var(--brand); } .eap-radio.off::before { content:'○ '; color:#9ca3af; }
+.eap-btns { display:flex; justify-content:center; gap:8px; margin-top:10px; }
+.eap-btns span { padding:5px 22px; border-radius:5px; border:1px solid #d1d5db; background:#f9fafb; font-size:.76rem; }
+.eap-btns span.p { background:var(--brand); border-color:var(--brand); color:#fff; font-weight:700; }
+.eap-callout { display:inline-flex; align-items:center; justify-content:center; width:17px; height:17px; border-radius:50%; background:#1d4ed8; color:#fff; font-size:.62rem; font-weight:800; margin-right:3px; vertical-align:1px; }
+.db-mock .db-body { padding:10px 14px 14px; font-family:'Segoe UI','맑은 고딕',sans-serif; font-size:.8rem; }
+.db-tree { list-style:none; margin:0; padding:0; }
+.db-tree ul { list-style:none; margin:0; padding-left:18px; }
+.db-tree li { padding:2px 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.db-tree .url { color:#9ca3af; font-style:italic; font-size:.72rem; margin-left:6px; }
+.db-tree .hl { background:#DBEAFE; border-radius:4px; padding:1px 6px; font-weight:700; }
+.db-tree .me { background:#FEF3C7; border-radius:4px; padding:1px 6px; font-weight:700; }
+.db-tree .note { color:var(--brand); font-weight:700; font-size:.72rem; margin-left:6px; font-family:inherit; }
+.db-form { display:grid; grid-template-columns:120px 1fr; gap:8px 10px; align-items:center; font-size:.8rem; }
+.db-form .l { color:#4b5563; }
+.db-form .in { background:#fff; border:1px solid #c7c7c7; border-radius:3px; padding:3px 8px; font-family:Consolas,monospace; font-size:.76rem; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.db-form .in.req { border-color:#1d4ed8; background:#F8FAFF; }
+.db-btns { display:flex; justify-content:flex-end; gap:6px; margin-top:12px; }
+.db-btns span { border:1px solid #c7c7c7; border-radius:3px; padding:3px 12px; font-size:.76rem; background:#f3f3f3; }
+.db-btns span.p { border-color:#1d4ed8; color:#1d4ed8; font-weight:700; }
+.view-vs { display:grid; grid-template-columns:1fr auto 1fr; gap:10px; align-items:center; margin-top:12px; }
+.view-vs .box { border:1px solid var(--border); border-radius:12px; padding:12px 14px; background:#fff; font-size:.86rem; }
+.view-vs .ar { font-size:1.3rem; color:#9ca3af; }
+@media (max-width:768px) { .eap-row.two { grid-template-columns:96px 1fr; } .eap-row { grid-template-columns:96px 1fr; } .eap-steps { flex-wrap:wrap; } .eap-steps i { display:none; } .db-tree li { white-space:normal; } .db-tree .url { display:none; } .db-form { grid-template-columns:1fr; } .view-vs { grid-template-columns:1fr; } .view-vs .ar { transform:rotate(90deg); text-align:center; } }
+
+
+/* ===== FIG 6 · 배치 하루 시계 (1-5) ===== */
+.bt-line { position:relative; margin:22px 22px 6px; height:58px; }
+.bt-track { position:absolute; left:0; right:0; top:22px; height:14px; border-radius:7px; background:#F3F4F6; overflow:hidden; }
+.bt-zone { position:absolute; top:0; bottom:0; }
+.bt-zone.night { background:#E0E7FF; } .bt-zone.work { background:#FEF3C7; } .bt-zone.batch { background:#7C3AED; }
+.bt-tick { position:absolute; top:40px; font-size:.72rem; color:var(--muted); transform:translateX(-50%); white-space:nowrap; }
+.bt-mark { position:absolute; top:0; font-size:.74rem; font-weight:800; transform:translateX(-50%); white-space:nowrap; }
+.bt-mark.batch { color:#6D28D9; } .bt-mark.work { color:#92400E; }
+.bt-hand { position:absolute; top:14px; width:4px; height:30px; margin-left:-2px; border-radius:2px; background:var(--brand); box-shadow:0 0 0 3px rgba(193,9,51,.15); transition:left .12s linear; }
+.bt-hand b { position:absolute; top:-22px; left:50%; transform:translateX(-50%); background:var(--brand); color:#fff; font-size:.74rem; padding:1px 8px; border-radius:999px; white-space:nowrap; }
+.bt-range { width:calc(100% - 44px); margin:0 22px; accent-color:var(--brand); }
+.bt-jumps { display:flex; flex-wrap:wrap; gap:6px; padding:6px 22px 0; }
+.bt-jumps button { font:inherit; font-size:.8rem; padding:4px 11px; border-radius:999px; border:1px solid var(--border); background:#fff; cursor:pointer; }
+.bt-jumps button.play { background:var(--brand); border-color:var(--brand); color:#fff; font-weight:700; }
+.bt-panels { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; padding:16px 22px 20px; }
+.bt-p { border:2px solid var(--border); border-radius:14px; padding:14px; background:#fff; min-width:0; transition:border-color .3s, box-shadow .3s; }
+.bt-p.act { border-color:var(--brand); box-shadow:0 0 0 4px rgba(193,9,51,.10); }
+.bt-p h4 { margin:0 0 8px; font-size:.95rem; } .bt-p h4 small { display:block; color:var(--muted); font-weight:400; font-size:.75rem; }
+.bt-big { font-size:1.6rem; font-weight:800; font-variant-numeric:tabular-nums; line-height:1.2; }
+.bt-big small { font-size:.8rem; font-weight:500; color:var(--muted); margin-left:4px; }
+.bt-row { font-size:.82rem; color:#374151; margin-top:6px; }
+.bt-badge { display:inline-block; font-size:.78rem; font-weight:800; padding:3px 10px; border-radius:999px; }
+.bt-badge.wait { background:#F3F4F6; color:#6b7280; } .bt-badge.run { background:#EDE9FE; color:#6D28D9; } .bt-badge.done { background:#DCFCE7; color:#166534; }
+.bt-prog { height:8px; border-radius:4px; background:#EDE9FE; margin-top:8px; overflow:hidden; } .bt-prog i { display:block; height:100%; width:0; background:#7C3AED; transition:width .15s; }
+.bt-since { font-size:.78rem; color:var(--brand); font-weight:700; margin-top:6px; }
+.why3 { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+/* 2-4 컬럼 고르기 · 실측 스캔량 */
+.cols-use { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:14px; }
+.colgrp { border:1px solid var(--border); border-radius:12px; padding:12px 14px; background:#fff; }
+.colgrp.use { border:2px solid #86EFAC; background:#F7FDF9; }
+.colgrp h4 { margin:0 0 8px; font-size:.95rem; }
+.colgrp code { font-size:.75rem; }
+.colgrp .why { font-size:.8rem; color:var(--muted); margin:4px 0 10px; }
+.colgrp .pill { display:inline-block; font-family:Consolas,monospace; font-size:.74rem; padding:1px 7px; border-radius:5px; margin:2px 3px 2px 0; background:#F3F4F6; border:1px solid #E5E7EB; }
+.colgrp.use .pill { background:#DCFCE7; border-color:#A7F3D0; color:#065F46; font-weight:700; }
+.colgrp .pill.no { background:#FEF2F2; border-color:#FECACA; color:#991B1B; }
+.scanbars { display:grid; gap:8px; }
+.scanbar { display:grid; grid-template-columns:minmax(150px,34%) 1fr 76px; gap:10px; align-items:center; font-size:.84rem; }
+.scanbar .tr { height:18px; background:#F3F4F6; border-radius:4px; overflow:hidden; }
+.scanbar .tr i { display:block; height:100%; border-radius:4px; background:#9ca3af; }
+.scanbar.bad .tr i { background:#dc2626; } .scanbar.best .tr i { background:#16a34a; }
+.scanbar b { font-variant-numeric:tabular-nums; text-align:right; }
+@media (max-width:900px) { .bt-panels, .why3, .cols-use { grid-template-columns:1fr; } .scanbar { grid-template-columns:1fr 70px; } .scanbar .lb { grid-column:1 / -1; } }
+
+
+/* 접기 영역 (상세 프롬프트) */
+details.more { border:1px solid var(--border); border-radius:12px; background:#FAFAFB; margin:16px 0; }
+details.more > summary { cursor:pointer; padding:14px 18px; font-weight:700; color:#374151; list-style:none; }
+details.more > summary::before { content:'▸ '; color:var(--brand); }
+details.more[open] > summary::before { content:'▾ '; }
+details.more > div { padding:0 18px 6px; }
+.grid-2 > .prompt-box { margin:12px 0; }
+
+/* 2-1 AD 속성 추가 · 키 다운로드 */
+.ad-box { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.15fr); gap:18px; align-items:start; margin:8px 0 4px; }
+.ad-why p { margin:0 0 10px; }
+.ad-box .prompt-box { margin:0; }
+.key-wrap { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); gap:22px; align-items:center; margin:8px 0 4px; }
+.key-card { display:grid; grid-template-columns:78px 1fr; gap:12px; align-items:center; border:1px solid #e5e7eb; border-radius:10px; padding:12px 14px; margin-bottom:8px; background:#fff; }
+.key-card .kc-l { font-weight:800; font-size:.8rem; line-height:1.35; color:#111; }
+.key-card .kc-r { border-left:1px solid #e5e7eb; padding-left:12px; }
+.key-card .kc-r p { margin:0 0 8px; font-size:.76rem; color:#333; }
+.kc-btn { display:inline-flex; justify-content:space-between; align-items:center; gap:28px; padding:6px 14px; border:1.5px solid var(--brand); border-radius:8px; font-size:.78rem; font-weight:700; box-shadow:0 0 0 4px rgba(193,9,51,.12); }
+.kc-btn i { font-style:normal; color:var(--brand); }
+.kc-tag { display:inline-block; background:#4b5563; color:#fff; font-size:.7rem; font-weight:700; padding:3px 8px; border-radius:4px; }
+.key-steps { margin:0; padding-left:20px; line-height:1.9; }
+@media (max-width:900px) { .ad-box, .key-wrap { grid-template-columns:1fr; } }
+
+/* 2교시 시작 구분 */
+.part-break { position:relative; overflow:hidden; color:#F9FAFB; background:radial-gradient(90% 120% at 100% 0%, rgba(193,9,51,.45) 0%, rgba(193,9,51,0) 55%), #0B0B0F; }
+.pb-inner { position:relative; max-width:1280px; margin:0 auto; padding:110px 8% 100px; }
+.pb-num { position:absolute; right:6%; top:40px; font-size:clamp(8rem, 20vw, 16rem); font-weight:900; line-height:1; color:transparent; -webkit-text-stroke:2px rgba(255,255,255,.12); pointer-events:none; user-select:none; }
+.pb-kicker { margin:0 0 18px; font-size:.9rem; font-weight:700; letter-spacing:.22em; color:#F87171; }
+.pb-title { position:relative; margin:0; font-size:clamp(2.4rem, 5.5vw, 4rem); font-weight:900; line-height:1.15; letter-spacing:-.02em; }
+.pb-lead { position:relative; margin:22px 0 0; max-width:40rem; font-size:1.12rem; line-height:1.7; color:#D1D5DB; }
+.pb-steps { position:relative; list-style:none; padding:0; margin:44px 0 0; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; }
+.pb-steps li { display:flex; flex-direction:column; gap:6px; padding:16px; border-radius:12px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); font-weight:700; }
+.pb-steps b { width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:var(--brand); color:#fff; font-size:.85rem; }
+.pb-steps span { font-size:.8rem; font-weight:500; color:#9CA3AF; }
+.pb-cta { position:relative; display:inline-flex; margin-top:40px; padding:12px 22px; border-radius:999px; background:#fff; color:#111; font-weight:700; text-decoration:none; }
+.pb-cta:hover { background:#FEE2E2; }
+@media (max-width:1024px) { .pb-inner { padding:80px 24px 70px; } .pb-steps { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+@media (max-width:520px) { .pb-steps { grid-template-columns:1fr 1fr; } .pb-lead br { display:none; } }
+
+/* 1-7 운영을 챙기지 않으면 생기는 흐름 */
+.decay { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; margin:8px 0 12px; }
+.d-step { position:relative; border-radius:14px; padding:18px 16px 16px; border:1px solid var(--border); background:#fff; }
+.d-step b { display:block; margin:8px 0 6px; font-size:1.02rem; }
+.d-step p { margin:0; font-size:.88rem; color:#4b5563; line-height:1.55; }
+.d-no { display:inline-flex; width:26px; height:26px; border-radius:50%; align-items:center; justify-content:center; font-size:.8rem; font-weight:800; color:#fff; background:#9ca3af; }
+.d-step:nth-child(2) .d-no { background:#f59e0b; } .d-step:nth-child(3) .d-no { background:#ea580c; } .d-step:nth-child(4) .d-no { background:var(--brand); }
+.d-step:nth-child(4) { background:#FEF2F2; border-color:#FECACA; }
+.d-step:not(:last-child)::after { content:'→'; position:absolute; right:-13px; top:50%; transform:translateY(-50%); z-index:1; color:#9ca3af; font-weight:900; }
+@media (max-width:900px) { .decay { grid-template-columns:1fr 1fr; } .d-step:nth-child(2)::after { display:none; } }
+@media (max-width:520px) { .decay { grid-template-columns:1fr; } .d-step::after { display:none; } }
+
+/* 마지막 문구 */
+.closing-line { position:relative; overflow:hidden; margin:56px 0 8px; padding:72px 28px 64px; border-radius:20px; text-align:center; color:#F9FAFB; background:radial-gradient(120% 90% at 50% 0%, rgba(165,0,52,.35) 0%, rgba(165,0,52,0) 60%), #0B0B0F; border:1px solid #1F2937; box-shadow:0 24px 48px -20px rgba(0,0,0,.6); }
+.closing-line .k { margin:0 0 22px; font-size:.85rem; font-weight:700; letter-spacing:.3em; color:#F87171; }
+.closing-line .t { margin:0; font-size:clamp(1.8rem, 4.4vw, 3rem); font-weight:900; line-height:1.4; letter-spacing:-.01em; word-break:keep-all; }
+.closing-line .t > span, .closing-line .s > span { display:inline-block; }
+.closing-line em { font-style:normal; color:#fff; background:linear-gradient(transparent 62%, rgba(220,38,38,.75) 62%); padding:0 .08em; }
+.closing-line .s { margin:30px auto 0; padding-top:24px; max-width:420px; border-top:1px solid #2A2E37; font-size:1.05rem; font-weight:600; color:#9CA3AF; word-break:keep-all; }
+@media (max-width:480px) { .closing-line { padding:52px 16px 44px; } .closing-line .t { font-size:1.55rem; } .closing-line .s { font-size:.95rem; } }
+</style>
+</head>
+<body>
+<div id="read-progress"></div>
+
+<nav class="nav-sidebar">
+  <div class="nav-brand"><div class="brand"><img src="https://www.lge.co.kr/lg5-common/images/header/lg_logo_new.svg" alt="LG Logo" class="h-8 md:h-9"><span class="brand-fallback" hidden><span class="brand-mark">LG</span><span class="brand-name">LG전자</span></span></div><p class="brand-sub">고객가치혁신부문 AX 심화 교육</p></div>
+
+  <div class="part-group">
+    <button class="part-header" id="btn-p0" onclick="togglePart('p0')"><span>시작하기</span><svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+    <div class="part-content" id="p0">
+      <a href="#s0-1" class="curriculum-item">0. 오늘의 목표 & 일정</a>
+    </div>
+  </div>
+  <div class="part-group">
+    <button class="part-header collapsed" id="btn-p1" onclick="togglePart('p1')"><span>1교시 · 구조와 연동 이해</span><svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+    <div class="part-content collapsed" id="p1">
+      <a href="#s1-1" class="curriculum-item">1-1. 기본교육 MVP의 한계</a>
+      <a href="#s1-2" class="curriculum-item">1-2. 프론트엔드·백엔드·저장소</a>
+      <a href="#s1-3" class="curriculum-item">1-3. 데이터 연동 방식 3가지</a>
+      <a href="#s1-link" class="curriculum-item">1-4. API · DB to DB 연동</a>
+      <a href="#s1-4" class="curriculum-item">1-5. 파이프라인 · 배치</a>
+      <a href="#s1-5" class="curriculum-item">1-6. 대시보드 개발 흐름</a>
+      <a href="#s1-6" class="curriculum-item">1-7. 개발·운영 관점</a>
+    </div>
+  </div>
+  <div class="part-group">
+    <button class="part-header collapsed" id="btn-p2" onclick="togglePart('p2')"><span>2교시 · GCP 데이터 연동</span><svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+    <div class="part-content collapsed" id="p2">
+      <a href="#s2-0" class="curriculum-item">2-0. 시연 순서</a>
+      <a href="#s2-1" class="curriculum-item">2-1. [시연A] EAP 데이터 사용요청</a>
+      <a href="#s2-2" class="curriculum-item">2-2. BigQuery 기본 개념</a>
+      <a href="#s2-3" class="curriculum-item">2-3. 서비스 계정과 키</a>
+      <a href="#s2-4" class="curriculum-item">2-4. [시연B] DBeaver로 확인</a>
+      <a href="#s2-5" class="curriculum-item">2-5. [시연C] 키로 인증·조회</a>
+      <a href="#s2-6" class="curriculum-item">2-6. [시연D] 대시보드 연결</a>
+      <a href="#s2-7" class="curriculum-item">2-7. [시연E] 갱신·권한·유지보수</a>
+    </div>
+  </div>
+  <div class="part-group">
+    <button class="part-header collapsed" id="btn-p3" onclick="togglePart('p3')"><span>마무리 · Q&amp;A</span><svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+    <div class="part-content collapsed" id="p3">
+      <a href="#s3-1" class="curriculum-item">3-1. 핵심 정리</a>
+      <a href="#s3-2" class="curriculum-item">3-2. 용어 정리</a>
+    </div>
+  </div>
+</nav>
+
+<main class="main-content">
+
+<!-- ====================================================== 표지 -->
+<header class="hero">
+  <div class="hero-inner">
+    <p class="hero-kicker hero-fade" style="animation-delay:.05s">고객가치혁신부문 AX 심화 교육</p>
+    <h1 class="hero-fade" style="animation-delay:.15s">MVP 대시보드에<br>실제 데이터를 연결합니다</h1>
+    <p class="hero-lead hero-fade" style="animation-delay:.3s">기본교육에서는 CSV를 AI에 첨부해 <strong>화면(MVP)</strong>을 만들었습니다.
+    이번 과정에서는 그 화면을 <strong>실제 데이터와 연결</strong>합니다. EAP로 개인정보를 제외한 데이터를 GCP(BigQuery)에서 조회하고,
+    키로 인증해 최신 값을 표시하는 대시보드까지 다룹니다.</p>
+    <div class="hero-chips hero-fade" style="animation-delay:.45s">
+      <a href="#s1-2" class="hero-chip"><span class="cn">1</span> 시스템 3층 구조</a>
+      <a href="#s1-link" class="hero-chip"><span class="cn">2</span> API · DB to DB 연동</a>
+      <a href="#s2-3" class="hero-chip"><span class="cn">3</span> GCP 키 인증</a>
+      <a href="#s2-6" class="hero-chip"><span class="cn">4</span> 대시보드 연결</a>
+      <a href="#s2-7" class="hero-chip"><span class="cn">5</span> 갱신·권한·운영</a>
+    </div>
+    <div class="hero-meta hero-fade" style="animation-delay:.6s">
+      <span>⏱ 120분 (이론 50 · 시연 50 · Q&amp;A 10)</span>
+      <span>🧪 시연키트 제공</span>
+      <span>🛡 비식별 데이터만 사용</span>
+      <a href="#s0-1" class="hero-cta">교육 시작하기 →</a>
+    </div>
+  </div>
+  <div class="scroll-cue">⌄</div>
+</header>
+
+<!-- ====================================================== 0 -->
+<section id="s0-1" class="content-section">
+  <h2 class="section-header">0. 오늘의 목표 & 일정</h2>
+  <p class="lead-text">교육을 마치면 <b>내 대시보드에 데이터를 연결할 때 필요한 준비물, 담당 부서, 진행 순서</b>를 설명할 수 있습니다.</p>
+
+  <div class="grid grid-3">
+    <div class="card-box lift num-card"><span class="n">1</span><h4>구조 이해</h4><p>화면·백엔드·데이터 저장소의 역할과 분리하는 이유</p></div>
+    <div class="card-box lift num-card"><span class="n">2</span><h4>연동 절차 이해</h4><p>API와 DB to DB 연동의 차이, EAP → BigQuery → 백엔드 → 대시보드 흐름과 신청 절차</p></div>
+    <div class="card-box lift num-card"><span class="n">3</span><h4>운영 기준 수립</h4><p>키 관리, 권한, 갱신 주기, 비용, 지표 정의 등 운영에 필요한 기준</p></div>
+  </div>
+
+  <div class="tt">
+    <div class="tt-head"><h3>📅 오늘 교육 일정</h3><span>총 <strong style="color:#374151">120분</strong> · 2교시 + Q&amp;A</span></div>
+
+    <div class="tt-row">
+      <div class="tt-when"><p class="n">1교시</p><p class="m">50분</p></div>
+      <div class="tt-body">
+        <span class="tt-tag">PART 1 · 시스템 구조 및 데이터 연동 이해</span><span class="tt-tag way">이론·사례</span>
+        <p class="tt-title">데이터 연동 구조와 절차 이해</p>
+        <div class="tt-chips">
+          <span>기본교육 MVP의 한계 4′</span><span>프론트·백엔드·저장소 9′</span><span class="add">연동 방식 3가지 비교 6′ · 추가</span>
+          <span class="add">API · DB to DB 연동 + 개인정보 절차 13′ · 추가</span><span>파이프라인 · 배치 8′</span><span>개발 흐름 5′</span><span>개발·운영 관점 5′</span>
+        </div>
+      </div>
+    </div>
+    <div class="tt-break">☕ 휴식 10분</div>
+
+    <div class="tt-row hl">
+      <div class="tt-when"><p class="n">2교시</p><p class="m">50분</p></div>
+      <div class="tt-body">
+        <span class="tt-tag">PART 2 · EAP·GCP 데이터 연동 및 대시보드 시연</span><span class="tt-tag way">이론·강사 시연</span>
+        <p class="tt-title">기본교육 MVP를 BigQuery에 연결하는 전 과정 시연</p>
+        <div class="tt-chips">
+          <span>[A] EAP 데이터 사용요청 8′</span><span>[B] DBeaver로 데이터 확인 10′</span><span>[C] 키 인증·조회 6′</span>
+          <span class="add">[D] 대시보드 연결 (EAP VOC 실데이터) 16′</span><span>[E] 갱신·권한·유지보수 8′</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="tt-row">
+      <div class="tt-when"><p class="n">마무리</p><p class="m">10분</p></div>
+      <div class="tt-body">
+        <span class="tt-tag">PART 3 · 질의응답 및 마무리</span><span class="tt-tag way">질의응답</span>
+        <p class="tt-title">핵심 정리 및 현업 적용 Q&amp;A</p>
+        <div class="tt-chips"><span>핵심 정리</span><span>용어 정리</span><span>질의응답</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="prep-box">
+    <h4>📦 교육 후 직접 해 보려면 (선택)</h4>
+    <p class="text-sm" style="margin:0 0 8px">2교시는 강사 시연으로 진행합니다. 교육 후 내 업무 데이터로 직접 연결해 보려면 아래를 준비합니다.</p>
+    <ol>
+      <li><b>AD 사용자 계정 속성 추가 요청</b> (최초 1회, ITS 요청 · 완료까지 1~2일) → 2-1 참고</li>
+      <li><b>EAP 데이터 사용요청 → 승인 완료</b> (승인까지 시간이 걸리므로 미리 신청)</li>
+      <li><b>EAP 마이페이지에서 GCP 서비스 계정 Key 다운로드</b> → 교육 폴더(<code class="i">심화교육</code>) <b>최상위</b>에 받은 이름 그대로 저장 (예: <code class="i">sa-user-사번_key.json</code>). 코드 폴더(<code class="i">시연키트</code>) 안에는 넣지 않습니다</li>
+      <li><b>DBeaver 설치</b> (사내 소프트웨어 설치 절차에 따름). 첫 연결 시 BigQuery 드라이버를 내려받습니다</li>
+      <li>(선택) Python 설치: 2-5의 코드 연결 과정을 직접 실행하려는 경우</li>
+    </ol>
+  </div>
+
+  <div class="info-box"><b>기본교육과 이어지는 과정입니다.</b> 기본교육 PART 4에서는 CSV를 첨부해 숫자가 코드에 들어간 MVP 화면을 만들었습니다. 이번에는 같은 방식으로 만든 화면을 유지하고 <b>데이터를 가져오는 부분만</b> 바꿔 EAP 데이터에 연결합니다.</div>
+</section>
+
+<!-- ====================================================== 1-1 -->
+<section id="s1-1" class="content-section">
+  <span class="part-tag">1교시</span>
+  <h2 class="section-header">1-1. 기본교육 MVP의 한계</h2>
+  <p class="lead-text">기본교육에서 만든 대시보드는 <b>숫자가 화면 코드 안에 직접 들어 있습니다.</b> 데이터가 바뀌어도 화면은 바뀌지 않습니다.</p>
+
+  <div class="vs">
+    <div class="card-box bad">
+      <h4>고정형: 데이터가 코드에 포함된 화면 (기본교육 MVP)</h4>
+      <div class="code"><span class="c">// Copilot이 CSV를 읽고</span>
+<span class="c">// 숫자를 그대로 써 넣음</span>
+<span class="k">const</span> DATA = {
+  kpi: { total: <span class="s">1000</span>, nps: <span class="s">39.8</span> },
+  by_product: [
+    { name: <span class="s">"휘센 에어컨"</span>, nps: <span class="s">-32.9</span> }, …
+  ]
+};</div>
+      <p class="text-sm">CSV를 첨부한 <b>시점의 값</b>이 고정됩니다. 다음 주 데이터가 쌓여도 화면은 그대로입니다.</p>
+    </div>
+    <div class="card-box good">
+      <h4>연동형: 열 때마다 조회하는 화면 (이번 과정)</h4>
+      <div class="code"><span class="c">// 화면에는 데이터가 없다</span>
+<span class="c">// 열릴 때마다 백엔드에 요청</span>
+<span class="k">const</span> res =
+  <span class="k">await</span> fetch(<span class="s">"/api/summary"</span>);
+<span class="k">const</span> DATA = <span class="k">await</span> res.json();</div>
+      <p class="text-sm">화면에는 데이터가 없고, 숫자는 열 때마다 데이터 저장소에서 집계해 받아옵니다.</p>
+    </div>
+  </div>
+
+  <div class="fx" id="fx-photo">
+    <div class="fx-top"><span class="fx-fig">FIG 1</span><span class="fx-title">1주 단위로 데이터가 쌓일 때 두 화면 비교</span></div>
+    <div class="ph-wh">🗄 <b>데이터 저장소</b>: <b data-w="week">25주차</b> · 누적 <b data-w="total">1,000</b>건 · 누적 NPS <b data-w="nps">39.8</b> <span class="ph-new" hidden></span></div>
+    <div class="ph-grid">
+      <div class="ph-card photo">
+        <div class="ph-h">고정형 (기본교육 MVP) <small>CSV를 첨부해 만든 화면</small></div>
+        <div class="ph-kpi"><div><small>누적 접수</small><b data-p="total">1,000건</b></div><div><small>누적 NPS</small><b data-p="nps">39.8</b></div></div>
+        <span class="ph-stamp" data-p="stamp">25주차 데이터 · 최신</span>
+        <div class="ph-foot">수동 재작성 <b data-p="manual">0</b>회</div>
+      </div>
+      <div class="ph-card window">
+        <div class="ph-h">연동형 (백엔드 연결) <small>열 때마다 저장소를 조회하는 화면</small></div>
+        <div class="ph-kpi"><div><small>누적 접수</small><b data-v="total">1,000건</b></div><div><small>누적 NPS</small><b data-v="nps">39.8</b></div></div>
+        <span class="ph-stamp" data-v="stamp">방금 조회 · 25주차까지</span>
+        <div class="ph-foot">수동 작업 <b>없음</b> (화면을 열면 자동 조회)</div>
+      </div>
+    </div>
+    <div class="fx-cap"><span class="fx-no">25주차</span><p></p></div>
+    <div class="fx-ctrl">
+      <button type="button" class="primary" data-a="next">⏩ 1주 뒤로 감기</button>
+      <button type="button" data-a="paste">📋 MVP 다시 만들기 (CSV 재첨부)</button>
+      <button type="button" data-a="reset">↺ 처음으로</button>
+    </div>
+  </div>
+  <p class="muted-note" style="margin-top:6px;">※ 26주차 이후 값은 설명용 가상 데이터입니다.</p>
+
+  <h3 class="sub"><span class="ico">🧱</span>MVP 방식의 한계 4가지</h3>
+  <div class="grid grid-4">
+    <div class="card-box lift"><b>① 용량</b><p class="text-sm text-muted mt-sm">10만 행 파일은 AI 대화창에 모두 들어가지 않음. 일부만 반영돼도 알아채기 어려움.</p></div>
+    <div class="card-box lift"><b>② 최신성</b><p class="text-sm text-muted mt-sm">데이터가 바뀔 때마다 다시 첨부해 새로 만들어야 함. 주 1회면 연 52회.</p></div>
+    <div class="card-box lift"><b>③ 보안</b><p class="text-sm text-muted mt-sm">고객명·연락처가 섞인 원본을 외부 AI에 올릴 수 없음.</p></div>
+    <div class="card-box lift"><b>④ 공유</b><p class="text-sm text-muted mt-sm">파일을 메일로 돌리면 누가 최신본을 보고 있는지 알 수 없음.</p></div>
+  </div>
+
+  <div class="info-box"><b>해결 방향:</b> 데이터를 AI나 화면 코드에 넣지 않고, <b>데이터는 저장소에 두고 백엔드가 필요할 때 조회</b>하도록 구성합니다.</div>
+</section>
+
+<!-- ====================================================== 1-2 -->
+<section id="s1-2" class="content-section">
+  <span class="part-tag">1교시</span>
+  <h2 class="section-header">1-2. 프론트엔드 · 백엔드 · 데이터 저장소</h2>
+  <p class="lead-text">대시보드는 <b>화면(프론트엔드)</b>, <b>조회 서버(백엔드)</b>, <b>데이터 저장소</b>의 세 부분으로 나뉩니다. 아래 그림의 <b>▶ 재생</b>으로 화면을 열 때의 처리 순서를 확인합니다.</p>
+
+  <div class="fx" id="fx-layers">
+    <div class="fx-top">
+      <span class="fx-fig">FIG 2</span><span class="fx-title">화면을 열었을 때 세 층에서 벌어지는 일</span>
+      <div class="fx-modes" role="tablist">
+        <button type="button" data-mode="normal" class="on">✅ 처음 열 때</button>
+        <button type="button" data-mode="cache">⚡ 다시 열 때 (캐시)</button>
+        <button type="button" data-mode="direct">❌ 백엔드 없이 직접 접속</button>
+      </div>
+    </div>
+
+    <div class="fx-stage">
+      <div class="fx-node" data-n="front">
+        <div class="fx-nh"><span class="fx-ic">📊</span><div><small>프론트엔드</small><b>대시보드 화면</b></div></div>
+        <p class="fx-role">사용자 브라우저에 표시되는 화면. <b>받은 숫자로 차트만 그립니다.</b></p>
+        <div class="fx-kpis">
+          <div><small>총 접수</small><b data-k="total">–</b></div>
+          <div><small>완료율</small><b data-k="rate">–</b></div>
+          <div><small>평균 처리</small><b data-k="lead">–</b></div>
+          <div><small>NPS</small><b data-k="nps">–</b></div>
+        </div>
+        <div class="fx-bars" aria-hidden="true"></div>
+        <div class="fx-code">const KEY = "-----BEGIN PRIVATE KEY----- MIIEvQIBADAN…"</div>
+        <div class="fx-has">
+          <span class="fx-chip" data-c="f-code">📄 화면 코드</span>
+          <span class="fx-chip key" data-c="f-key" hidden>🔑 키 (HTML에 포함)</span>
+          <span class="fx-chip good" data-c="f-nums" hidden>🔢 숫자 12개</span>
+          <span class="fx-chip bad" data-c="f-rows" hidden>📚 원본 1,000행</span>
+        </div>
+      </div>
+
+      <div class="fx-node" data-n="back">
+        <div class="fx-nh"><span class="fx-ic">⚙️</span><div><small>백엔드</small><b>조회 서버 (server.py)</b></div></div>
+        <p class="fx-role">요청을 받아 저장소를 조회하고 <b>집계값만</b> 돌려줍니다. 키는 백엔드에만 둡니다.</p>
+        <div class="fx-log" aria-live="polite"></div>
+        <div class="fx-has">
+          <span class="fx-chip key" data-c="b-key">🔑 키 보관</span>
+          <span class="fx-chip" data-c="b-calc">🧮 지표 계산식</span>
+          <span class="fx-chip" data-c="b-cache">🗃 캐시: 비어 있음</span>
+        </div>
+        <div class="fx-none"><span>🚫</span>백엔드 없음<small style="font-weight:400">화면이 저장소에 직접 접속</small></div>
+      </div>
+
+      <div class="fx-node" data-n="data">
+        <span class="fx-zz">💤 이번엔 조회 안 함</span>
+        <div class="fx-nh"><span class="fx-ic">🗄</span><div><small>데이터 저장소</small><b>BigQuery 테이블</b></div></div>
+        <p class="fx-role">EAP가 적재한 원본 데이터 보관. <b>원본은 저장소 밖으로 나가지 않습니다.</b></p>
+        <div class="fx-grid" aria-hidden="true"></div>
+        <div class="fx-count">cs_receipt · <b data-c="rows">1,000</b>행 × 9컬럼 · <span data-c="scan">대기</span></div>
+        <div class="fx-has">
+          <span class="fx-chip" data-c="d-rows">📚 원본 1,000행</span>
+          <span class="fx-chip good" data-c="d-pii">🛡 개인정보 없음 (EAP)</span>
+        </div>
+      </div>
+
+      <div class="fx-packet" aria-hidden="true"></div>
+      <div class="fx-thief" hidden>👀 HTML 파일을 받은 <b>누구나</b> F12로 키 확인 가능 <span data-c="t-key"></span></div>
+    </div>
+
+    <div class="fx-cap"><span class="fx-no">0 / 0</span><p></p></div>
+    <div class="fx-ctrl">
+      <button type="button" class="primary" data-a="play">▶ 재생</button>
+      <button type="button" data-a="step">⏭ 한 단계씩</button>
+      <button type="button" data-a="reset">↺ 처음으로</button>
+      <div class="fx-dots" aria-hidden="true"></div>
+    </div>
+  </div>
+
+  <h3 class="sub"><span class="ico">🔐</span>백엔드가 필요한 이유: 키는 화면에 둘 수 없음</h3>
+  <div class="vs">
+    <div class="card-box bad">
+      <h4>❌ 화면(HTML)이 직접 BigQuery에 접속</h4>
+      <p class="text-sm">직접 접속하려면 키를 HTML에 넣어야 합니다. HTML은 <b>받은 사람 누구나 메모장이나 F12로 내용을 볼 수 있으므로</b> 파일을 전달하는 순간 키가 노출됩니다.</p>
+    </div>
+    <div class="card-box good">
+      <h4>✅ 백엔드만 키를 갖고, 화면은 백엔드에 요청</h4>
+      <p class="text-sm">키는 서버 PC에만 있고, 화면은 <code class="i">/api/summary</code> 주소만 호출합니다. 화면 코드를 열어도 <b>키와 원본 데이터는 보이지 않습니다.</b></p>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+  <table class="table-custom">
+    <tr><th>구분</th><th>프론트엔드</th><th>백엔드</th><th>데이터 저장소</th></tr>
+    <tr><td><b>누가 보나</b></td><td>사용자 브라우저</td><td>서버(사내 PC/서버)</td><td>GCP 안</td></tr>
+    <tr><td><b>무엇을 갖나</b></td><td>화면 코드</td><td>키, 쿼리, 지표 계산식</td><td>원본 데이터</td></tr>
+    <tr><td><b>바뀌는 이유</b></td><td>디자인·차트 변경</td><td>지표 추가, 컬럼 변경</td><td>데이터 갱신, 스키마 변경</td></tr>
+    <tr><td><b>AI가 도와주는 일</b></td><td>화면 생성(기본교육)</td><td>코드 생성(이번 과정), <b>컬럼 정보만 제공</b></td><td>쿼리 작성 보조</td></tr>
+  </table>
+  </div>
+</section>
+
+<!-- ====================================================== 1-3 -->
+<section id="s1-3" class="content-section">
+  <span class="part-tag">1교시</span>
+  <h2 class="section-header">1-3. 데이터 연동 방식 3가지</h2>
+  <p class="lead-text">데이터 연동 방식은 크게 세 가지입니다. 대시보드 용도에 맞는 방식을 먼저 정합니다.</p>
+
+  <div class="grid grid-3">
+    <div class="card-box lift">
+      <span class="badge">방식 ①</span>
+      <h4 class="mt-sm" style="margin-bottom:4px;">파일 첨부 · 붙여넣기</h4>
+      <p class="text-sm text-muted">AI에 CSV를 첨부해 숫자가 포함된 화면을 생성. <b>기본교육 MVP</b> 방식.</p>
+    </div>
+    <div class="card-box lift">
+      <span class="badge">방식 ②</span>
+      <h4 class="mt-sm" style="margin-bottom:4px;">파일 주기 추출</h4>
+      <p class="text-sm text-muted">매일·매주 엑셀/CSV를 공유폴더에 저장하고, 백엔드가 해당 파일을 읽음.</p>
+    </div>
+    <div class="card-box lift" style="border:2px solid var(--brand);">
+      <span class="badge">방식 ③ · 오늘</span>
+      <h4 class="mt-sm" style="margin-bottom:4px;">시스템 연동 (API · DB to DB)</h4>
+      <p class="text-sm text-muted">EAP가 BigQuery에 적재(DB to DB) → 백엔드가 키로 조회 → 화면은 API로 수신. <b>세부 내용은 1-4 참고.</b></p>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+  <table class="table-custom">
+    <tr><th>비교</th><th>① 파일 첨부</th><th>② 파일 주기 추출</th><th>③ 시스템 연동</th></tr>
+    <tr><td><b>최신성</b></td><td class="no">첨부한 순간</td><td>추출 주기만큼</td><td class="yes">적재 주기 + 열 때마다 조회</td></tr>
+    <tr><td><b>데이터 양</b></td><td class="no">수천 행까지</td><td>수십만 행(PC 성능 한계)</td><td class="yes">수백만 행 이상</td></tr>
+    <tr><td><b>개인정보</b></td><td class="no">원본이 AI로 나감</td><td>파일이 여기저기 복사됨</td><td class="yes">EAP에서 제거, 키로 접근 통제<br><span class="muted-note">개인정보 포함 시 영향평가·적법성평가 선행</span></td></tr>
+    <tr><td><b>공유</b></td><td>파일 전송</td><td>공유폴더 권한</td><td class="yes">링크 + 권한</td></tr>
+    <tr><td><b>준비할 것</b></td><td>없음</td><td>추출 담당, 폴더</td><td>EAP 신청 또는 API 신청, 키·토큰, 백엔드</td></tr>
+    <tr><td><b>적합</b></td><td>1회성 보고, 시안</td><td>소규모 팀 현황판</td><td>계속 보는 운영 대시보드</td></tr>
+  </table>
+  </div>
+
+  <div class="tipbox"><b>선택 기준:</b> ① 화면을 계속 사용하는가 ② 개인정보가 포함되거나 데이터 양이 많은가. 하나라도 해당하면 ③ 시스템 연동, 둘 다 해당하지 않으면 ① 파일 첨부로 충분합니다.</div>
+</section>
+
+<!-- ====================================================== 1-4 (신규) -->
+<section id="s1-link" class="content-section">
+  <span class="part-tag">1교시</span>
+  <h2 class="section-header">1-4. API 연동과 DB to DB 연동</h2>
+  <p class="lead-text">1-3의 ③ <b>시스템 연동</b>은 필요할 때마다 요청하는 <b>API 연동</b>과, 정해진 주기로 데이터를 옮겨 두는 <b>DB to DB 연동</b>으로 나뉩니다. 이번 과정의 대시보드는 <b>두 방식을 함께</b> 사용합니다.</p>
+
+  <h3 class="sub"><span class="ico">🔌</span>API의 개념</h3>
+  <p><b>API(Application Programming Interface)</b>는 한 프로그램이 다른 프로그램에게 데이터를 달라고(또는 저장해 달라고) 요청하는 <b>정해진 방식</b>입니다. 프로그램이 정해진 주소로 요청을 보내면 정해진 형식(주로 JSON)으로 결과가 돌아옵니다.</p>
+  <div class="grid grid-3 concept3">
+    <div class="card-box lift"><span class="big">📜</span><h4>명세로 정의된다</h4><p class="text-sm text-muted">요청 주소, 조건, 응답 형식을 명세서로 정해 둡니다. 상대 시스템의 내부 구조를 몰라도 명세대로 호출하면 됩니다.</p></div>
+    <div class="card-box lift"><span class="big">📂</span><h4>제공된 범위만 조회한다</h4><p class="text-sm text-muted">상대 시스템의 DB에 직접 접속하지 않고 <b>제공된 API로만</b> 요청합니다. 제공 범위는 API를 만든 쪽이 정합니다.</p></div>
+    <div class="card-box lift"><span class="big">🔑</span><h4>인증이 필요하다</h4><p class="text-sm text-muted">요청할 때 API 키나 토큰으로 인증합니다. <b>권한 범위 안에서만</b> 응답하며, 호출 횟수도 제한할 수 있습니다.</p></div>
+  </div>
+
+  <h3 class="sub"><span class="ico">🧩</span>API 요청의 구성 요소</h3>
+  <div class="parts5">
+    <div class="card-box"><b>① 주소 (엔드포인트)</b><span class="text-sm text-muted">요청할 주소</span><br><code class="i">/api/summary</code></div>
+    <div class="card-box"><b>② 방식 (메서드)</b><span class="text-sm text-muted">조회는 GET, 등록은 POST</span><br><code class="i">GET</code></div>
+    <div class="card-box"><b>③ 조건 (파라미터)</b><span class="text-sm text-muted">무엇을, 어느 범위로</span><br><code class="i">?from=19&amp;to=25</code></div>
+    <div class="card-box"><b>④ 인증 (헤더)</b><span class="text-sm text-muted">API 키 · 토큰</span><br><code class="i">Authorization</code></div>
+    <div class="card-box"><b>⑤ 응답 (상태 + 본문)</b><span class="text-sm text-muted">성공 여부 + 데이터</span><br><code class="i">200 OK + JSON</code></div>
+  </div>
+
+  <div class="fx mt-lg" id="fx-api">
+    <div class="fx-top"><span class="fx-fig">FIG 3</span><span class="fx-title">API 요청·응답 확인</span></div>
+    <div class="api-flow"><span data-f="1">📨 요청 전송</span><span data-f="2">⚙️ 서버 처리 (집계)</span><span data-f="3">📦 응답 수신</span></div>
+    <div class="api-grid">
+      <div class="api-box">
+        <div class="api-h">① 요청: 화면 → 백엔드</div>
+        <div class="api-form">
+          <span class="k">방식</span><span><span class="api-m">GET</span> <small class="text-muted">조회</small></span>
+          <span class="k">주소</span><span><code class="i">/api/summary</code></span>
+          <span class="k">조건</span><span>from <select data-p="from"></select> ~ to <select data-p="to"></select></span>
+          <span class="k">인증</span><span class="api-auth"><button type="button" data-auth="on" class="on">🔑 토큰 포함</button> <button type="button" data-auth="off">없음</button></span>
+        </div>
+        <pre class="api-wire" aria-label="실제로 전송되는 요청"></pre>
+        <button type="button" class="api-send">📨 요청 보내기</button>
+      </div>
+      <div class="api-box">
+        <div class="api-h">② 응답: 백엔드 → 화면</div>
+        <div><span class="api-status">대기 중</span><span class="api-meta"></span></div>
+        <pre class="api-body">요청을 보내면 여기에 응답이 옵니다.</pre>
+        <div class="fx-kpis api-kpis">
+          <div><small>총 접수</small><b data-k="total">–</b></div><div><small>완료율</small><b data-k="rate">–</b></div>
+          <div><small>평균 처리</small><b data-k="lead">–</b></div><div><small>NPS</small><b data-k="nps">–</b></div>
+        </div>
+      </div>
+    </div>
+    <div class="fx-cap"><span class="fx-no">해설</span><p></p></div>
+    <p class="api-note">※ 이 예시는 인증을 생략했지만, <b>사내 시스템 API는 대부분 토큰(또는 API 키)을 요구</b>합니다.</p>
+  </div>
+
+  <h3 class="sub"><span class="ico">🚦</span>응답 상태 코드</h3>
+  <div class="table-wrap">
+  <table class="table-custom">
+    <tr><th style="width:16%">코드</th><th style="width:24%">뜻</th><th>대시보드 담당자가 할 일</th></tr>
+    <tr><td><b class="yes">200</b> OK</td><td>성공</td><td>본문(JSON)을 읽어 화면에 그린다</td></tr>
+    <tr><td><b>400</b> Bad Request</td><td>요청 형식이 틀림</td><td>파라미터 이름·값을 명세서와 비교 (예: from이 to보다 큼)</td></tr>
+    <tr><td><b class="no">401</b> Unauthorized</td><td>인증 실패</td><td>토큰이 빠졌거나 만료 → 재발급·갱신</td></tr>
+    <tr><td><b class="no">403</b> Forbidden</td><td>인증은 됐으나 권한 없음</td><td>제공 부서에 권한 범위 요청</td></tr>
+    <tr><td><b>404</b> Not Found</td><td>요청한 주소 없음</td><td>주소 오타, 명세서 버전 확인</td></tr>
+    <tr><td><b>429</b> Too Many Requests</td><td>호출 한도 초과</td><td>캐시를 두고 호출 횟수 줄이기</td></tr>
+    <tr><td><b>500</b> Server Error</td><td>제공하는 쪽 서버 오류</td><td>잠시 후 재시도, 계속되면 제공 부서에 문의</td></tr>
+  </table>
+  </div>
+
+  <h3 class="sub"><span class="ico">📄</span>API 명세서 (API 사용 신청 시 제공)</h3>
+  <div class="grid grid-2">
+    <div class="spec">
+      <div class="spec-h">CS 접수 요약 조회 API <small>v1 · 예시</small></div>
+      <table>
+        <tr><td>주소</td><td><code class="i">GET https://(사내 API 주소)/cs/v1/summary</code></td></tr>
+        <tr><td>요청 파라미터</td><td><code class="i">from</code>, <code class="i">to</code> (주차, 정수, 필수) · <code class="i">product</code> (선택)</td></tr>
+        <tr><td>인증</td><td>헤더 <code class="i">Authorization: Bearer {토큰}</code> · 토큰 유효기간 90일</td></tr>
+        <tr><td>응답 필드</td><td><code class="i">total</code>, <code class="i">done</code>, <code class="i">nps</code>, <code class="i">by_week[]</code></td></tr>
+        <tr><td>호출 한도</td><td>분당 60회</td></tr>
+        <tr><td>데이터 기준</td><td>매일 06시 갱신 (전일까지)</td></tr>
+        <tr><td>담당 · 문의</td><td>제공 시스템 담당 부서</td></tr>
+      </table>
+    </div>
+    <div>
+      <div class="info-box" style="margin-top:0"><b>명세서가 있으면 Copilot으로 호출 코드를 만들 수 있습니다.</b><br>명세서 내용을 전달하고 "이 명세대로 호출하는 백엔드 코드를 만들어 줘. 토큰은 .env에서 읽어"라고 요청합니다. <b>토큰 값은 전달하지 않습니다.</b></div>
+      <div class="vs">
+        <div class="card-box"><h4 class="text-sm" style="margin:0 0 4px;">API 호출 (사용하는 쪽)</h4><p class="text-sm text-muted" style="margin:0">사내 시스템이 열어 준 API를 우리 백엔드가 호출해 데이터를 가져옵니다.</p></div>
+        <div class="card-box good"><h4 class="text-sm" style="margin:0 0 4px;">API 제공 (만드는 쪽)</h4><p class="text-sm text-muted" style="margin:0"><code class="i">server.py</code>처럼 API를 만들어 화면에 집계값을 제공합니다.</p></div>
+      </div>
+      <p class="muted-note">개념은 같고 역할만 다릅니다. 이번 대시보드에서는 화면과 <code class="i">server.py</code> 사이가 API입니다.</p>
+    </div>
+  </div>
+
+  <h3 class="sub"><span class="ico">🗄</span>DB to DB 연동의 개념</h3>
+  <p>원천 시스템의 DB에서 <b>우리가 쓸 분석용 DB(데이터 마트)</b>로 정해진 주기에 데이터를 복사하는 방식입니다. 복사한 뒤에는 원천 시스템을 다시 조회하지 않고 <b>분석용 DB에서 SQL로 집계</b>합니다. 2교시의 <b>EAP → BigQuery</b>가 이 방식입니다.</p>
+  <div class="d2d">
+    <div class="db">🏢<b>원천 DB</b><small>업무 시스템 · 개인정보 포함</small></div>
+    <div class="pipe-arrow">일배치(새벽) · 변경분 · 개인정보 제외</div>
+    <div class="db" style="border-color:#FCD34D">🧹<b>EAP</b><small>추출 · 변환 · 적재 (ETL)</small></div>
+    <div class="pipe-arrow">적재</div>
+    <div class="db" style="border-color:#86EFAC">🗄<b>BigQuery 마트</b><small>우리가 SQL로 조회</small></div>
+  </div>
+  <div class="grid grid-4">
+    <div class="card-box"><b>전체 적재 vs 변경분 적재</b><p class="text-sm text-muted mt-sm">매번 전부 다시 옮기거나(전체), 바뀐 것만 옮깁니다(변경분·증분). 데이터가 많으면 변경분 적재를 사용합니다.</p></div>
+    <div class="card-box"><b>배치 스케줄</b><p class="text-sm text-muted mt-sm">EAP는 대부분 <b>하루 1번, 근무시간 전</b>에 도는 일배치. 화면 데이터의 최신성은 이 주기를 따릅니다(1-5 FIG 6).</p></div>
+    <div class="card-box"><b>스키마 매핑</b><p class="text-sm text-muted mt-sm">원천 컬럼 → 대상 컬럼 이름·타입 대응표. 원천이 바뀌면 적재가 깨질 수 있습니다.</p></div>
+    <div class="card-box"><b>전용 계정 · 접속 경로</b><p class="text-sm text-muted mt-sm">적재용 계정과 조회용 계정을 나누고, 허용된 경로로만 접속합니다.</p></div>
+  </div>
+
+  <h3 class="sub"><span class="ico">⚖️</span>API와 DB to DB 비교</h3>
+  <div class="table-wrap">
+  <table class="table-custom">
+    <tr><th style="width:18%">비교</th><th>🔌 API 연동</th><th>🗄 DB to DB 연동</th></tr>
+    <tr><td><b>가져오는 방식</b></td><td>필요할 때마다 요청 (요청 → 응답)</td><td>정해진 주기에 일괄 복사</td></tr>
+    <tr><td><b>최신성</b></td><td class="yes">호출한 그 순간</td><td>적재 주기만큼 (예: 전일 기준)</td></tr>
+    <tr><td><b>한 번에 다루는 양</b></td><td>적음 · 조건별 (한 건, 한 범위)</td><td class="yes">대량 · 이력 전체</td></tr>
+    <tr><td><b>계산 자유도</b></td><td>제공된 범위 내에서만</td><td class="yes">SQL로 자유롭게 집계</td></tr>
+    <tr><td><b>원천 시스템 부하</b></td><td>호출할 때마다 (호출 한도 있음)</td><td>적재할 때 한 번</td></tr>
+    <tr><td><b>원천이 멈추면</b></td><td class="no">화면도 멈춤</td><td>마지막 적재분으로 계속 보임</td></tr>
+    <tr><td><b>원천 구조가 바뀌면</b></td><td class="yes">명세가 유지되면 영향 적음</td><td class="no">스키마 매핑 수정 필요</td></tr>
+    <tr><td><b>준비할 것</b></td><td>API 명세서 · 인증 토큰 · 호출 한도</td><td>EAP 신청 · 적재 테이블 · 조회용 키</td></tr>
+    <tr><td><b>잘 맞는 일</b></td><td>실시간 단건 조회, 등록·변경(쓰기)</td><td>대시보드 · 통계 · 이력 분석</td></tr>
+  </table>
+  </div>
+
+  <h3 class="sub"><span class="ico">🧱</span>이번 과정의 구조: DB to DB + API</h3>
+  <div class="combo">
+    <div>🏢 원천 시스템</div>
+    <div class="lane d">🗄 DB to DB<br>EAP · 일배치(새벽)</div>
+    <div>BigQuery 마트</div>
+    <div class="lane d">SQL 조회<br>(조회용 키)</div>
+    <div>⚙️ server.py</div>
+    <div class="lane a">🔌 API<br>/api/summary</div>
+    <div>📊 대시보드</div>
+  </div>
+  <p class="muted-note mt-sm">대량 데이터는 DB to DB로 옮겨 두고, 화면에는 API로 필요한 집계값만 제공합니다. 운영 대시보드에서 가장 많이 쓰는 구성입니다.</p>
+
+  <div class="fx mt-lg" id="fx-cases">
+    <div class="fx-top"><span class="fx-fig">FIG 4</span><span class="fx-title">상황별 연동 방식 (카드를 누르면 답 표시)</span></div>
+    <div class="cases">
+      <button type="button" class="case"><span class="q">📞 상담사가 통화 중에 고객 1명의 수리 진행상태를 바로 확인</span><span class="hint">답 보기 ▸</span>
+        <span class="ans"><span class="in"><span class="tag api">🔌 API</span><span class="p">한 건의 현재 상태가 필요합니다. 전일 기준 데이터로는 부족하고, 데이터 양도 적습니다.</span></span></span></button>
+      <button type="button" class="case"><span class="q">📊 주간 회의에서 보는 제품별 NPS 추이 대시보드</span><span class="hint">답 보기 ▸</span>
+        <span class="ans"><span class="in"><span class="tag both">🗄 DB to DB + 🔌 API</span><span class="p">이번 과정의 구조입니다. 수만 건의 이력을 매일 옮겨 두고(DB to DB), 화면에는 백엔드 API로 집계값만 제공합니다. 전일 기준이면 충분합니다.</span></span></span></button>
+      <button type="button" class="case"><span class="q">🔍 3년치 수리 이력 수백만 건으로 불량 패턴 분석</span><span class="hint">답 보기 ▸</span>
+        <span class="ans"><span class="in"><span class="tag d2d">🗄 DB to DB</span><span class="p">대량 이력을 SQL로 다양하게 분석해야 합니다. API로 수백만 건을 나눠 받으면 원천 시스템 부담이 크고 호출 한도에 걸립니다.</span></span></span></button>
+      <button type="button" class="case"><span class="q">📝 우리 화면에서 입력한 개선 과제를 다른 업무 시스템에 등록</span><span class="hint">답 보기 ▸</span>
+        <span class="ans"><span class="in"><span class="tag api">🔌 API (POST)</span><span class="p">다른 시스템에 데이터를 <b>등록</b>할 때는 그 시스템이 제공하는 API를 사용합니다. 다른 시스템의 DB에 직접 입력하지 않습니다.</span></span></span></button>
+    </div>
+  </div>
+
+  <div class="privacy-box">
+    <h4>🔒 개인정보 포함 데이터: 연동 신청 전 2가지 평가 필수</h4>
+    <div class="privacy-flow">
+      <div><b>① 프라이버시센터</b>개인정보 영향평가 <b style="display:inline">완료</b></div>
+      <div class="ar">➜</div>
+      <div><b>② 약관포털</b>데이터 사용에 대한 적법성평가 진행</div>
+      <div class="ar">➜</div>
+      <div><b>③ 연동 신청 · 개발</b>EAP 신청 / API 사용 신청</div>
+    </div>
+    <p>평가가 끝나기 전에는 연동 신청·개발·테스트를 시작하지 않습니다. EAP로 개인정보 컬럼을 빼고 쓸 계획이더라도 원천 데이터에 개인정보가 들어 있다면, 평가 대상인지 <b>프라이버시센터에 먼저 확인</b>하세요. 사용 목적이나 항목이 바뀔 때도 다시 확인합니다.</p>
+  </div>
+</section>
+
+<!-- ====================================================== 1-5 -->
+<section id="s1-4" class="content-section">
+  <span class="part-tag">1교시</span>
+  <h2 class="section-header">1-5. 데이터 파이프라인과 배치</h2>
+  <p class="lead-text">파이프라인은 원천 데이터가 <b>대시보드의 숫자가 되기까지 거치는 처리 과정</b>입니다. 한 번 구성하면 별도 작업 없이 같은 과정이 반복됩니다. <b>▶ 재생</b>으로 단계별 데이터 형태를 확인합니다.</p>
+
+  <div class="fx" id="fx-pipe">
+    <div class="fx-top"><span class="fx-fig">FIG 5</span><span class="fx-title">접수 데이터가 화면의 숫자가 되기까지</span></div>
+    <div class="pipe pp-stages">
+    <div class="stage"><div class="no">STEP 1</div><h4>🏢 원천 시스템</h4><p>접수·수리·만족도 데이터가 처음 생기는 사내 업무 시스템. 고객명·연락처 포함.</p><span class="who">IT 시스템 담당</span></div>
+    <div class="stage demo"><div class="no">STEP 2 · 시연 A</div><h4>🧹 EAP 추출·비식별</h4><p>필요한 컬럼만 고르고 <b>개인정보 컬럼 제외</b>, 정해진 주기로 GCP에 적재. <span style="color:#991B1B">개인정보 포함 시 영향평가·적법성평가 후 신청.</span></p><span class="who">신청: 현업 / 승인: 데이터 담당</span></div>
+    <div class="stage hl"><div class="no">STEP 3 · 시연 B</div><h4>🗄 BigQuery 테이블</h4><p>비식별 데이터가 쌓이는 저장소. 집계 쿼리를 빠르게 실행.</p><span class="who">GCP 프로젝트 관리자</span></div>
+    <div class="stage hl"><div class="no">STEP 4 · 시연 C·D</div><h4>⚙️ 백엔드(API)</h4><p><b>조회 전용 키</b>로 쿼리 → 합계·평균만 JSON으로. 캐시·비용 상한.</p><span class="who">대시보드 담당(현업+AI)</span></div>
+    <div class="stage hl"><div class="no">STEP 5 · 시연 D</div><h4>📊 대시보드</h4><p>MVP에서 만든 화면. 열 때마다 API를 호출해 최신 값 표시.</p><span class="who">대시보드 담당 / 사용자</span></div>
+    </div>
+    <div class="pp-view" aria-live="polite"></div>
+    <div class="fx-cap"><span class="fx-no">0 / 5</span><p></p></div>
+    <div class="fx-ctrl">
+      <button type="button" class="primary" data-a="play">▶ 재생</button>
+      <button type="button" data-a="step">⏭ 한 단계씩</button>
+      <button type="button" data-a="reset">↺ 처음으로</button>
+      <div class="fx-dots" aria-hidden="true"></div>
+    </div>
+  </div>
+  <p class="muted-note" style="margin-top:6px;">※ 원천 시스템 표의 고객 정보는 형태만 보여주는 가상 값입니다.</p>
+  <div class="zone-line">
+    <span style="background:#fef2f2;color:#991b1b;">STEP 1: 개인정보 있음</span>
+    <span style="background:#f0fdf4;color:#166534;">STEP 2 이후: 개인정보 없음</span>
+    <span style="background:#eff6ff;color:#1d4ed8;">STEP 4→5: 집계값(수십 개 숫자)만 이동</span>
+  </div>
+
+  <h3 class="sub"><span class="ico">⏰</span>배치(Batch): EAP 데이터의 갱신 시점</h3>
+  <p><b>배치</b>는 데이터를 실시간으로 하나씩 옮기지 않고, <b>정해진 시각에 모아서 한꺼번에</b> 처리하는 방식입니다. EAP 데이터는 대부분 <b>하루 한 번 도는 일배치</b>이고, 보통 <b>근무시간 이전(새벽)</b>에 돌아갑니다. 따라서 대시보드에는 <b>마지막 배치 시점까지의 데이터</b>가 표시됩니다.</p>
+
+  <div class="fx" id="fx-batch">
+    <div class="fx-top"><span class="fx-fig">FIG 6</span><span class="fx-title">시간대별 원천 시스템 · 저장소 · 화면 상태</span></div>
+    <div class="bt-line" aria-hidden="true">
+      <div class="bt-track">
+        <span class="bt-zone night" style="left:0;width:25%"></span>
+        <span class="bt-zone batch" style="left:25%;width:1.6%"></span>
+        <span class="bt-zone work" style="left:37.5%;width:37.5%"></span>
+      </div>
+      <span class="bt-mark batch" style="left:25.7%">⚙ 배치 06시</span>
+      <span class="bt-mark work" style="left:37.5%">출근 09시</span>
+      <span class="bt-mark work" style="left:75%">퇴근 18시</span>
+      <span class="bt-tick" style="left:0%">00시</span><span class="bt-tick" style="left:25%">06시</span><span class="bt-tick" style="left:50%">12시</span><span class="bt-tick" style="left:75%">18시</span><span class="bt-tick" style="left:100%">24시</span>
+      <div class="bt-hand"><b>00:00</b></div>
+    </div>
+    <input type="range" class="bt-range" min="0" max="1439" step="1" value="180" aria-label="시각">
+    <div class="bt-jumps">
+      <button type="button" class="play">▶ 하루 재생</button>
+      <button type="button" data-t="180">새벽 03:00</button>
+      <button type="button" data-t="372">배치 중 06:12</button>
+      <button type="button" data-t="540">출근 09:00</button>
+      <button type="button" data-t="900">오후 15:00</button>
+      <button type="button" data-t="1380">밤 23:00</button>
+    </div>
+    <div class="bt-panels">
+      <div class="bt-p" data-p="src"><h4>🏢 원천 시스템<small>VOC가 실제로 접수되는 곳</small></h4>
+        <div class="bt-big"><span data-v="today">0</span><small>건 · 오늘(D) 접수</small></div>
+        <div class="bt-row">어제(D-1) 접수 <b data-v="yday">—</b>건은 확정</div></div>
+      <div class="bt-p" data-p="bq"><h4>🗄 EAP → BigQuery 뷰<small>내 사번 데이터셋의 뷰</small></h4>
+        <span class="bt-badge wait" data-v="badge">대기</span>
+        <div class="bt-prog"><i data-v="prog"></i></div>
+        <div class="bt-row">마지막 적재 <b data-v="load">어제 06:20</b> <span class="text-muted">(ETL_LOAD_TS)</span></div></div>
+      <div class="bt-p" data-p="dash"><h4>📊 대시보드<small>열 때마다 뷰를 조회</small></h4>
+        <div class="bt-big"><span data-v="basis">D-2</span><small>까지 반영</small></div>
+        <div class="bt-row" data-v="dashnote">—</div>
+        <div class="bt-since" data-v="gap"></div></div>
+    </div>
+    <div class="fx-cap"><span class="fx-no">03:00</span><p></p></div>
+  </div>
+  <p class="muted-note" style="margin-top:6px;">※ 배치 시각 06:20은 시연용 VOC 뷰의 <code class="i">ETL_LOAD_TS</code>에서 관측한 예시입니다. 데이터셋마다 시각이 다르고, 원천 시스템 연계에 따라 며칠 늦게 처음 들어오는 데이터도 있으므로 <b>최신 접수일</b>과 <b>마지막 적재 시각</b>으로 확인합니다.</p>
+
+  <h3 class="sub"><span class="ico">🌙</span>근무시간 전에 배치를 실행하는 이유</h3>
+  <div class="why3">
+    <div class="card-box lift"><b>원천 시스템 부하 최소화</b><p class="text-sm text-muted mt-sm">낮에는 상담·접수 업무로 시스템 사용량이 많습니다. 대량 추출은 사용량이 적은 새벽에 진행합니다.</p></div>
+    <div class="card-box lift"><b>업무 시작 전 데이터 준비</b><p class="text-sm text-muted mt-sm">오전 회의 전에 전일까지의 데이터가 반영되도록 근무 시작 전에 배치를 완료합니다.</p></div>
+    <div class="card-box lift"><b>하루 동안 같은 기준 유지</b><p class="text-sm text-muted mt-sm">하루 동안 같은 기준의 숫자를 사용하므로 오전 회의와 오후 보고의 수치가 일치합니다.</p></div>
+  </div>
+
+  <h3 class="sub"><span class="ico">🧭</span>일배치 데이터의 대시보드 설계 기준</h3>
+  <div class="table-wrap">
+  <table class="table-custom">
+    <tr><th style="width:30%">설계 기준</th><th>이유</th></tr>
+    <tr><td><b>마지막 배치 적재 시각 표시</b></td><td>사용자는 화면 숫자를 현재 값으로 인식합니다. <code class="i">MAX(ETL_LOAD_TS)</code>를 한국시간으로 표시해 데이터 기준 시점을 명확히 합니다.</td></tr>
+    <tr><td><b>캐시 시간을 길게 설정 (예: 1시간)</b></td><td>하루 한 번 바뀌는 데이터를 5분마다 다시 조회할 필요가 없습니다. 비용과 응답 속도가 모두 개선됩니다.</td></tr>
+    <tr><td><b>당일 데이터 미반영 안내</b></td><td>당일 접수 건은 다음 배치 이후에 반영됩니다. 관련 문의가 없도록 화면 하단에 안내 문구를 표시합니다.</td></tr>
+    <tr><td><b>배치 지연 시 적재 시각 확인</b></td><td>오전에 숫자가 전날과 같으면 <code class="i">ETL_LOAD_TS</code>가 당일 새벽인지 먼저 확인하고, 아니면 EAP 담당에 배치 지연 여부를 확인합니다.</td></tr>
+    <tr><td><b>실시간 필요 시 별도 검토</b></td><td>분 단위가 필요한 업무(예: 통화 중 조회)는 일배치가 아니라 API 연동(1-4)을 검토합니다.</td></tr>
+  </table>
+  </div>
+  <div class="prompt-box"><span class="prompt-label">마지막 배치 적재 시각 확인 (DBeaver SQL)</span>SELECT
+  FORMAT_TIMESTAMP('%Y-%m-%d %H:%M', MAX(ETL_LOAD_TS), 'Asia/Seoul') AS last_load_kst,   -- 저장은 UTC → 한국시간으로 변환
+  MAX(P_PTT) AS last_rcpt_date                                                           -- 최신 접수일
+FROM `pjt-lge-edl-user.ZU_사번.FV_edl__L0_SMIP__SI_VOC`
+WHERE P_PTT >= DATE_SUB(CURRENT_DATE('Asia/Seoul'), INTERVAL 14 DAY);</div>
+
+
+  <h3 class="sub"><span class="ico">📖</span>파이프라인 주요 용어</h3>
+  <div class="grid grid-2">
+    <div class="card-box"><b>ETL (추출·변환·적재) · <code class="i">ETL_LOAD_TS</code></b><p class="text-sm text-muted mt-sm">원천에서 뽑고(Extract) → 컬럼 정리·개인정보 제거(Transform) → 저장소에 넣기(Load). <b>EAP가 수행하는 작업</b>입니다. EAP 뷰의 <code class="i">ETL_LOAD_TS</code>는 그 행이 적재된 시각입니다.</p></div>
+    <div class="card-box"><b>배치 vs 실시간</b><p class="text-sm text-muted mt-sm">정해진 시각에 묶어서 옮기면 배치, 생기는 즉시 옮기면 실시간. EAP는 대부분 <b>일배치(근무시간 전)</b>이며, 운영 대시보드는 대부분 일배치로 충분합니다. 화면 데이터는 마지막 배치 시점까지만 반영됩니다.</p></div>
+    <div class="card-box"><b>스키마</b><p class="text-sm text-muted mt-sm">테이블의 컬럼 이름·타입 목록. Copilot에 전달하는 데이터 정보가 스키마입니다. 실제 값은 전달하지 않습니다.</p></div>
+    <div class="card-box"><b>API</b><p class="text-sm text-muted mt-sm">정해진 주소로 요청하면 정해진 형식으로 응답하는 방식. 예: <code class="i">GET /api/summary?from=19&amp;to=25</code> → KPI JSON.</p></div>
+  </div>
+</section>
+
+<!-- ====================================================== 1-6 -->
+<section id="s1-5" class="content-section">
+  <span class="part-tag">1교시</span>
+  <h2 class="section-header">1-6. 대시보드 개발 흐름</h2>
+  <p class="lead-text">기본교육에서 ①~③을 진행했습니다. 이번 과정에서는 ④~⑥을 다루고, ⑦~⑧은 운영 관점에서 설명합니다.</p>
+
+  <div class="flow-steps">
+    <div class="card-box done num-card"><span class="n">1</span><span class="tag done">기본교육</span><h4 class="mt-sm">질문 정의</h4><p>누가 어떤 결정에 사용하는지 정의. 예: "주간 회의에서 NPS 하락 제품 확인"</p></div>
+    <div class="card-box done num-card"><span class="n">2</span><span class="tag done">기본교육</span><h4 class="mt-sm">지표 정의</h4><p>NPS 계산식, 분모, 기간 기준을 <b>지표 정의서</b>로 정리.</p></div>
+    <div class="card-box done num-card"><span class="n">3</span><span class="tag done">기본교육</span><h4 class="mt-sm">MVP 화면</h4><p>샘플 데이터로 화면 확정. 이해관계자 합의.</p></div>
+    <div class="card-box today num-card"><span class="n">4</span><span class="tag today">오늘 · 시연A</span><h4 class="mt-sm">데이터 확보</h4><p>(개인정보 포함 시 영향평가·적법성평가) → EAP·API 신청 → 테이블 ID·갱신 주기 확인.</p></div>
+    <div class="card-box today num-card"><span class="n">5</span><span class="tag today">오늘 · 시연B~D</span><h4 class="mt-sm">백엔드 연결</h4><p>키 발급 → 연결 테스트 → API 생성 → 화면의 데이터 블록 교체.</p></div>
+    <div class="card-box today num-card"><span class="n">6</span><span class="tag today">오늘 · 시연E</span><h4 class="mt-sm">검증</h4><p>원천 시스템/기존 보고서 숫자와 <b>대조</b>. 다르면 지표 정의부터 확인.</p></div>
+    <div class="card-box num-card"><span class="n">7</span><span class="tag next">다음 단계</span><h4 class="mt-sm">배포·공유</h4><p>내 PC → 사내 서버. 접속 대상과 권한 확정.</p></div>
+    <div class="card-box num-card"><span class="n">8</span><span class="tag next">다음 단계</span><h4 class="mt-sm">운영</h4><p>갱신 감시, 키 교체, 지표 변경 요청 처리, 담당자 지정.</p></div>
+  </div>
+
+  <div class="info-box mt-lg"><b>MVP 화면은 그대로 활용합니다.</b> ①~③에서 화면 구성과 표시 지표가 이미 정해졌으므로, 화면 코드에서는 <b>데이터를 가져오는 부분만</b> 변경합니다(2-6 참고).</div>
+</section>
+
+<!-- ====================================================== 1-7 -->
+<section id="s1-6" class="content-section">
+  <span class="part-tag">1교시</span>
+  <h2 class="section-header">1-7. 개발·운영 관점</h2>
+  <p class="lead-text">대시보드는 개발보다 운영 기간이 훨씬 깁니다. 만든 뒤에도 숫자가 맞는지 계속 챙겨야 사용자가 믿고 봅니다.</p>
+
+  <h3 class="sub"><span class="ico">🔁</span>만들고 끝이 아니라, 운영까지</h3>
+  <div class="vs">
+    <div class="card-box bad">
+      <h4>그동안: 업무혁신팀 + 개발자·SM 계약</h4>
+      <ul class="check">
+        <li>업무혁신팀과 함께 요건을 정하고, 개발자가 만들고, <b>SM이 운영</b></li>
+        <li>데이터 정합성 점검, 기존 시스템과의 숫자 대조, 장애 대응을 운영 담당이 맡음</li>
+        <li>개발 기간·비용이 커서 대시보드 수가 많지 않았고, 관리 대상이 분명함</li>
+      </ul>
+    </div>
+    <div class="card-box good">
+      <h4>지금: 현업이 AI로 직접 개발</h4>
+      <ul class="check">
+        <li>Copilot으로 며칠 만에 만들 수 있어 <b>여기저기서 대시보드가 생기는 중</b></li>
+        <li>SM이 없으므로 <b>만든 사람이 곧 운영 담당자</b></li>
+        <li>정합성 점검과 숫자 맞추기도 만든 사람이 직접 챙겨야 함</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3 class="sub"><span class="ico">⚠️</span>운영을 챙기지 않으면 생기는 일</h3>
+  <div class="decay">
+    <div class="d-step"><span class="d-no">1</span><b>대시보드가 늘어남</b><p>부서마다, 사람마다 비슷한 화면을 만듦</p></div>
+    <div class="d-step"><span class="d-no">2</span><b>숫자가 서로 다름</b><p>같은 지표인데 화면마다, 기존 시스템과 값이 다름</p></div>
+    <div class="d-step"><span class="d-no">3</span><b>"어느 게 맞나요?"</b><p>사용자는 매번 확인해야 해서 피곤해지고, 다시 엑셀을 찾음</p></div>
+    <div class="d-step"><span class="d-no">4</span><b>버려지는 대시보드</b><p>아무도 보지 않는 화면이 남고, 키·비용·관리 부담만 남음</p></div>
+  </div>
+
+  <h3 class="sub"><span class="ico">✅</span>그래서 지켜야 할 3가지</h3>
+  <div class="grid grid-3">
+    <div class="card-box lift num-card"><span class="n">A</span><h4>정합성은 계속 확인</h4><p>배치가 돈 뒤 건수·합계가 평소 범위인지, 0건이거나 급변하지 않았는지, 적재 시각이 늦지 않았는지 확인합니다.</p></div>
+    <div class="card-box lift num-card"><span class="n">B</span><h4>기존 시스템과 숫자 맞추기</h4><p>오픈 전에 기존 보고서·운영 시스템 숫자와 대조합니다. 차이가 나면 원인(분모·기간·중복·적재 시점)을 찾아 지표 정의서에 남깁니다.</p></div>
+    <div class="card-box lift num-card"><span class="n">C</span><h4>만들기 전에 찾고, 안 쓰면 정리</h4><p>같은 목적의 대시보드가 이미 있으면 그 화면을 고쳐 씁니다. 일정 기간 쓰지 않는 화면은 통합하거나 닫습니다.</p></div>
+  </div>
+  <div class="warn"><b>대시보드의 가치는 개수가 아니라, 믿고 볼 수 있는 숫자에 있습니다.</b> 새로 만들기 전에 "기존 시스템 숫자와 맞출 수 있는가, 누가 계속 운영할 것인가"를 먼저 정합니다.</div>
+
+  <h3 class="sub"><span class="ico">📋</span>개발 전에 정할 6가지</h3>
+  <div class="grid grid-3">
+    <div class="card-box lift num-card"><span class="n">1</span><h4>지표 정의 통일</h4><p>같은 NPS라도 계산법이 다르면 숫자가 다릅니다. 계산식은 <b>백엔드 한 곳</b>에만 둡니다.</p></div>
+    <div class="card-box lift num-card"><span class="n">2</span><h4>기준 시각 표시</h4><p>화면에 데이터 기준일과 조회 시각을 항상 표시. 사용자는 화면 숫자를 현재 값으로 인식합니다.</p></div>
+    <div class="card-box lift num-card"><span class="n">3</span><h4>갱신 주기 합의</h4><p>EAP는 대부분 <b>일배치(근무시간 전)</b> → 화면은 전일 기준. 실시간 반영으로 안내하지 않습니다.</p></div>
+    <div class="card-box lift num-card"><span class="n">4</span><h4>권한·공유 범위</h4><p>화면 조회 대상, 키 보관자, 퇴사·전배 시 회수 방법을 정합니다.</p></div>
+    <div class="card-box lift num-card"><span class="n">5</span><h4>비용 상한</h4><p>BigQuery는 <b>읽은 데이터 양</b>만큼 과금. 쿼리 1회 상한과 캐시로 과다 비용을 막습니다.</p></div>
+    <div class="card-box lift num-card"><span class="n">6</span><h4>담당자·장애 대응</h4><p>장애 발생 시 확인할 담당자(정·부)와 확인 순서를 문서로 정리합니다.</p></div>
+  </div>
+
+  <h3 class="sub"><span class="ico">🧮</span>사례: 분모 정의에 따른 NPS 차이 (40.0 vs 39.0)</h3>
+  <div class="fx" id="fx-nps">
+    <div class="fx-top">
+      <span class="fx-fig">FIG 7</span><span class="fx-title">같은 데이터, 분모만 바꿔 보기 (19~25주차 934건)</span>
+      <div class="fx-modes">
+        <button type="button" data-m="scored" class="on">✅ 분모 = 점수가 있는 건</button>
+        <button type="button" data-m="all">⚠️ 분모 = 전체 접수건</button>
+      </div>
+    </div>
+    <div class="nps-body">
+      <div class="nps-bar">
+        <div class="p" style="width:53.64%">추천 501</div>
+        <div class="n" style="width:29.12%">중립 272</div>
+        <div class="d" style="width:14.67%">비추천 137</div>
+        <div class="x" style="width:2.57%" title="진행중 24건 (점수 없음)"></div>
+      </div>
+      <div class="nps-den"><div class="br"></div><div class="lb">분모 910건</div></div>
+      <div class="nps-legend">
+        <span><i style="background:#16a34a"></i>추천 (9~10점)</span><span><i style="background:#9ca3af"></i>중립 (7~8점)</span>
+        <span><i style="background:#dc2626"></i>비추천 (0~6점)</span><span><i style="background:#f59e0b"></i>진행중 24건 (점수 없음)</span>
+      </div>
+      <div class="nps-formula">NPS = ( <span class="t p">추천 501</span> − <span class="t d">비추천 137</span> ) ÷ <span class="t den">910</span> × 100 = <span class="nps-res">40.0</span></div>
+    </div>
+    <div class="fx-cap"><span class="fx-no">정의</span><p></p></div>
+  </div>
+  <div class="info-box">시연키트의 백엔드는 <code class="i">COUNT(nps_score)</code>로 <b>점수가 있는 건만</b> 분모로 사용합니다. 계산식을 백엔드 한 곳에서 관리하므로 어느 화면에서도 같은 값이 표시됩니다.</div>
+</section>
+
+<!-- ====================================================== 2교시 구분 -->
+<div class="part-break" id="part2-start">
+  <div class="pb-inner">
+    <span class="pb-num" aria-hidden="true">02</span>
+    <p class="pb-kicker">PART 2 · 2교시 · 50분</p>
+    <h2 class="pb-title">GCP 데이터 연동 시연</h2>
+    <p class="pb-lead">1교시에서 본 구조를 실제로 연결합니다.<br>EAP 데이터 요청부터 대시보드 화면까지, 강사 시연으로 진행합니다.</p>
+    <ol class="pb-steps">
+      <li><b>A</b>EAP 사용요청<span>8분</span></li>
+      <li><b>B</b>DBeaver 확인<span>10분</span></li>
+      <li><b>C</b>키 인증·조회<span>6분</span></li>
+      <li><b>D</b>대시보드 연결<span>16분</span></li>
+      <li><b>E</b>갱신·운영<span>8분</span></li>
+    </ol>
+    <a href="#s2-0" class="pb-cta">시연 순서 보기 ↓</a>
+  </div>
+</div>
+
+<!-- ====================================================== 2-0 -->
+<section id="s2-0" class="content-section">
+  <span class="part-tag demo">2교시</span>
+  <h2 class="section-header">2-0. 시연 순서</h2>
+  <p class="lead-text">2교시는 <b>강사 시연</b>으로 진행합니다. 진행 순서는 아래와 같습니다.</p>
+
+  <div class="pipe">
+    <div class="stage demo"><div class="no">시연 A · 8분</div><h4>EAP 데이터 사용요청</h4><p>요청 3단계 → 승인 → 내 사번 데이터셋 생성</p></div>
+    <div class="stage demo"><div class="no">시연 B · 10분</div><h4>DBeaver로 데이터 확인</h4><p>EAP 키로 연결 → 사번 데이터셋 → 뷰</p></div>
+    <div class="stage demo"><div class="no">시연 C · 6분</div><h4>코드로 키 인증·조회</h4><p>같은 키로 step1_test_connection.py</p></div>
+    <div class="stage demo"><div class="no">시연 D · 16분</div><h4>대시보드 연결</h4><p>연동 전 화면 → API 연동, EAP VOC 화면</p></div>
+    <div class="stage demo"><div class="no">시연 E · 8분</div><h4>갱신·권한·운영</h4><p>새 데이터 반영, 유의사항</p></div>
+  </div>
+
+  <div class="warn">⚠️ 시연은 강사의 EAP VOC 데이터로 진행합니다. 교육 후 직접 해 보려면 0장의 준비 사항을 갖춘 뒤 2-4(DBeaver), 2-5(코드) 순서로 진행합니다.</div>
+</section>
+
+<!-- ====================================================== 2-1 -->
+<section id="s2-1" class="content-section">
+  <span class="part-tag demo">2교시 · 시연 A</span>
+  <h2 class="section-header">2-1. EAP로 데이터 사용 요청하기</h2>
+  <p class="lead-text"><b>EAP(Enterprise Analytics Platform)</b>에서 데이터를 찾아 사용을 요청하면, 승인 후 BigQuery에 <b>내 사번 이름의 데이터셋</b>이 생기고 그 안에 요청한 데이터가 <b>뷰</b>로 들어옵니다.</p>
+  <div class="danger">🔒 <b>요청 전 확인:</b> 원천 데이터에 개인정보가 있다면 <b>① 프라이버시센터 개인정보 영향평가 완료 → ② 약관포털 데이터 사용 적법성평가</b>를 먼저 진행합니다. (1-4 참고)</div>
+
+  <h3 class="sub"><span class="ico">🔑</span>신청 전 사전 작업: AD 사용자 계정 속성 추가 (최초 1회)</h3>
+  <div class="ad-box">
+    <div class="ad-why">
+      <p>EAP 데이터를 사용하려면 내 <b>AD 사용자 계정에 속성을 추가</b>하는 작업이 먼저 필요합니다. 처음 데이터 사용 신청을 하면 EAP에 아래 안내 창이 뜹니다.</p>
+      <ul class="check">
+        <li>ITS로 요청 → <b>결재 완료 후 속성 추가까지 1~2일</b> 소요</li>
+        <li>한 번 해 두면 이후 신청부터는 다시 하지 않음</li>
+        <li>일정이 촉박하면 교육·개발 일정보다 <b>먼저</b> 요청</li>
+      </ul>
+    </div>
+    <div class="prompt-box"><span class="prompt-label">ITS 요청 양식 (EAP 안내 기준)</span>요청경로: EP > ITS(http://its.lge.com) > Active Directory > AD 기타 요청
+제목: AD 사용자 계정 속성 추가 요청 (EAP 2.0 활용)
+본문: EAP 2.0 활용 목적으로 SSO 계정(예: gildong.hong)에 추가속성, 값 적용 요청
+[추가속성: 값] extensionAttribute15 : cid-sync</div>
+  </div>
+  <p class="muted-note">SSO 계정 자리에는 본인 계정을 적습니다. 양식이 바뀔 수 있으므로 신청 시 EAP 안내 창의 내용을 기준으로 합니다.</p>
+
+  <div class="pipe p6">
+    <div class="stage"><div class="no">⓪ 최초 1회</div><h4>🔑 AD 속성 추가</h4><p>ITS 요청 → 결재 → 1~2일</p></div>
+    <div class="stage"><div class="no">①</div><h4>🔍 데이터 찾기</h4><p>EAP 상단 메뉴 <b>데이터 찾기</b>에서 필요한 데이터셋 검색</p></div>
+    <div class="stage hl"><div class="no">② Step 1</div><h4>📝 기본 정보</h4><p>활용처·요청사유·활용목적·이용 목적 입력</p></div>
+    <div class="stage hl"><div class="no">③ Step 2</div><h4>☑ 사용항목 / 결재라인</h4><p>쓸 항목(컬럼) 선택, 결재라인 지정</p></div>
+    <div class="stage hl"><div class="no">④ Step 3</div><h4>✅ 신청완료</h4><p>결재 승인 대기</p></div>
+    <div class="stage"><div class="no">⑤ 승인 후</div><h4>🗄 내 데이터셋 생성</h4><p><code class="i">pjt-lge-edl-user</code> › <code class="i">ZU_사번</code> › 뷰 생성 → <b>마이페이지</b>에서 키 다운로드</p></div>
+  </div>
+
+  <h3 class="sub"><span class="ico">📝</span>Step 1 · 기본 정보 작성 요령</h3>
+  <div class="eap-wrap">
+    <div class="ui-mockup eap-mock">
+      <div class="ui-mockup-header"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="text-xs text-muted" style="margin-left:8px;">EAP · 데이터 사용요청 (화면 예시)</span></div>
+      <div class="eap-top"><div class="eap-logo">EAP<small><b>E</b>nterprise <b>A</b>nalytics <b>P</b>latform</small></div>
+        <div class="eap-menu"><span>데이터 찾기</span><span class="on">요청하기</span><span>데이터 분석</span><span>마이페이지</span><span>게시판</span><span>데이터 표준</span></div></div>
+      <div class="eap-body">
+        <div class="eap-title">데이터 사용요청 현황</div>
+        <div class="eap-steps"><span class="on">Step 1. 기본 정보</span><i></i><span>Step 2. 사용항목 / 결재라인</span><i></i><span>Step 3. 신청완료</span></div>
+        <div class="eap-panel">
+          <div class="eap-row two"><span class="l"><span class="eap-callout">1</span>데이터셋 명</span><span class="v">SI_VOC</span><span class="l">설명</span><span class="v">IF_VOC</span></div>
+          <div class="eap-row two"><span class="l">구분</span><span class="v">Enterprise</span><span class="l"><span class="eap-callout">2</span>개인정보</span><span class="v">포함 <span class="ok">사용가능 (개인정보 취급자 권한 보유중)</span></span></div>
+          <div class="eap-row"><span class="l"><span class="eap-callout">3</span>활용처</span><span class="v"><span class="eap-radio">개인</span> &nbsp; <span class="eap-radio off">시스템 연계</span></span></div>
+          <div class="eap-row"><span class="l"><span class="eap-callout">4</span>요청사유*</span><span class="v"><span class="eap-in wide">VOC 데이터 수집 분석 활용을 위하여 신청합니다.</span></span></div>
+        </div>
+        <div class="eap-panel">
+          <div class="eap-row two"><span class="l"><span class="eap-callout">5</span>활용목적*</span><span class="v"><span class="eap-in sel">서비스(CS)</span></span><span class="l">추가 정보*</span><span class="v"><span class="eap-in sel">선택</span> <span class="eap-in sel">선택</span></span></div>
+          <div class="eap-row"><span class="l">이용 목적*</span><span class="v"><span class="eap-in sel">선택</span> <span class="eap-in sel">선택</span> <span class="eap-in">직접입력 시 입력해주세요</span></span></div>
+        </div>
+        <div class="eap-btns"><span>취소</span><span class="p">다음</span></div>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="table-custom" style="margin-top:0">
+        <tr><th style="width:24%">항목</th><th>작성 요령</th></tr>
+        <tr><td><span class="eap-callout">1</span><b>데이터셋 명·설명</b></td><td><b>데이터 찾기</b>에서 고른 데이터셋이 채워집니다. (예: <code class="i">SI_VOC</code>)</td></tr>
+        <tr><td><span class="eap-callout">2</span><b>개인정보</b></td><td>개인정보 <b>포함 여부</b>와 <b>내 권한으로 사용 가능한지</b>(예: 개인정보 취급자 권한 보유중)가 표시됩니다. "포함"인 경우 개인정보 사전 절차 완료 여부를 확인합니다.</td></tr>
+        <tr><td><span class="eap-callout">3</span><b>활용처</b></td><td><b>개인</b> 또는 <b>시스템 연계</b> 중 선택. 오늘처럼 본인이 DBeaver·대시보드로 직접 조회하는 경우 <b>개인</b>을 선택합니다(세부 기준은 EAP 안내 참고).</td></tr>
+        <tr><td><span class="eap-callout">4</span><b>요청사유</b></td><td>사용 목적을 <b>구체적으로</b> 작성. 예) "주간 VOC 유형별 추이 대시보드 구축을 위한 집계 분석"</td></tr>
+        <tr><td><span class="eap-callout">5</span><b>활용목적·추가 정보·이용 목적</b></td><td>목록에서 고르고, 맞는 항목이 없으면 직접 입력합니다.</td></tr>
+        <tr><td><b>Step 2 사용항목</b></td><td><b>필요한 항목(컬럼)만</b> 고릅니다. 필요 이상 요청하지 않아야 개인정보 위험과 비용이 줄어듭니다.</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="demo-card mt-lg">
+    <span class="badge">🎬 강사 시연</span>
+    <h4 style="margin:10px 0 0;">승인 후 확인할 3가지</h4>
+    <div class="watch">
+      <div><b>① 내 데이터셋</b>BigQuery 프로젝트 <code class="i">pjt-lge-edl-user</code> 안에 <b>본인 사번</b> 이름의 데이터셋 (예: <code class="i">ZU_사번</code>)</div>
+      <div><b>② 요청한 데이터 = 뷰</b>데이터셋의 <b>뷰</b> 폴더에 요청한 데이터가 보입니다 (예: <code class="i">FV_edl__L0_SMIP__SI_VOC</code>)</div>
+      <div><b>③ 키 파일</b>EAP <b>마이페이지</b>에서 GCP 서비스 계정 Key를 다운로드해 <b>교육 폴더 최상위</b>에 저장 → 시연 B에서 DBeaver에 첨부</div>
+    </div>
+  </div>
+
+  <h3 class="sub"><span class="ico">⬇️</span>승인 후: GCP 서비스 계정 Key 다운로드</h3>
+  <div class="key-wrap">
+    <div class="ui-mockup eap-mock">
+      <div class="ui-mockup-header"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="text-xs text-muted" style="margin-left:8px;">EAP · 마이페이지 (화면 예시)</span></div>
+      <div class="eap-top"><div class="eap-logo">EAP<small><b>E</b>nterprise <b>A</b>nalytics <b>P</b>latform</small></div>
+        <div class="eap-menu"><span>데이터 찾기</span><span>요청하기</span><span>데이터 분석</span><span class="on">마이페이지</span><span>게시판</span><span>데이터 표준</span></div></div>
+      <div class="eap-body">
+        <div class="eap-title">내 정보/알림</div>
+        <div class="key-card">
+          <div class="kc-l">GCP<br>서비스<br>계정 Key</div>
+          <div class="kc-r"><p>Enterprise데이터를 사용신청(개인으로)한 이력이 있어야 서비스키가 정상 생성됩니다.</p><span class="kc-btn">다운로드 <i>⤓</i></span></div>
+        </div>
+        <div class="key-card sm"><div class="kc-l">취급 권한</div><div class="kc-r"><span class="kc-tag">개인정보 취급자</span></div></div>
+      </div>
+    </div>
+    <ol class="key-steps">
+      <li>EAP 상단 메뉴 <b>마이페이지</b> → <b>내 정보/알림</b></li>
+      <li><b>GCP 서비스 계정 Key</b> 칸의 <b>다운로드</b> 클릭 → JSON 키 파일 저장</li>
+      <li>받은 파일을 이름 그대로 <b>교육 폴더(<code class="i">심화교육</code>) 최상위</b>에 둡니다 (예: <code class="i">sa-user-사번_key.json</code>)</li>
+    </ol>
+  </div>
+  <div class="warn">⚠️ Enterprise 데이터를 <b>활용처 "개인"으로 사용신청한 이력</b>이 있어야 키가 생성됩니다. 다운로드가 안 되면 신청 이력과 승인 상태부터 확인합니다. 키 파일은 메일·메신저로 전달하지 않고, 필요한 사람은 각자 받습니다.</div>
+</section>
+
+<!-- ====================================================== 2-2 -->
+<section id="s2-2" class="content-section">
+  <span class="part-tag demo">2교시</span>
+  <h2 class="section-header">2-2. GCP · BigQuery 기본 개념</h2>
+  <p class="lead-text"><b>GCP</b>는 구글의 클라우드, <b>BigQuery</b>는 그 안의 <b>대용량 집계 전용 데이터베이스</b>입니다. 구조를 엑셀에 대응하면 다음과 같습니다.</p>
+
+  <div class="grid grid-2">
+    <div class="nest">
+      <div class="lbl">📁 프로젝트 <small>= 회사 공유 드라이브 · 예: pjt-lge-edl-user</small></div>
+      <div class="nest">
+        <div class="lbl">📗 데이터셋 <small>= 엑셀 파일 · 예: ZU_사번 (EAP가 본인 이름으로 만들어 줌)</small></div>
+        <div class="nest">
+          <div class="lbl">📄 테이블 · 👁 뷰 <small>= 시트 · 예: FV_edl__L0_SMIP__SI_VOC</small></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-box">
+      <b>이름(ID) 읽는 법</b>
+      <div class="code" style="white-space:pre-wrap;"><span class="s">pjt-lge-edl-user</span> . <span class="k">ZU_사번</span> . FV_edl__L0_SMIP__SI_VOC
+<span class="c">  프로젝트            데이터셋     뷰</span></div>
+      <p class="text-sm">코드와 SQL에는 <b>세 부분을 모두</b> 씁니다. 프로젝트 이름에 하이픈(-)이 있어 SQL에서는 전체를 <b>백틱(`)</b>으로 감쌉니다. DBeaver 탐색기에서 <b>프로젝트 › 데이터셋 › 뷰</b> 순서로 보입니다.</p>
+    </div>
+  </div>
+
+  <h3 class="sub"><span class="ico">👁</span>테이블과 뷰</h3>
+  <div class="view-vs">
+    <div class="box"><b>📄 테이블</b><br>데이터가 <b>실제로 저장</b>된 곳. 원본 테이블은 EAP가 관리합니다.</div>
+    <div class="ar">➜</div>
+    <div class="box" style="border-color:#93C5FD;background:#F8FAFF"><b>👁 뷰 (View)</b><br>원본 테이블을 조회하는 <b>저장된 쿼리</b>. 데이터를 복사하지 않고, <b>승인된 범위만</b> 내 데이터셋에서 보이게 합니다.</div>
+  </div>
+  <p class="muted-note mt-sm">조회 방법은 테이블과 같습니다(<code class="i">SELECT … FROM 뷰이름</code>). 뷰를 조회하면 원본 테이블을 읽으므로 <b>비용 원칙(필요한 컬럼만 조회)</b>도 동일하게 적용됩니다.</p>
+
+  <h3 class="sub"><span class="ico">⚡</span>BigQuery의 특징</h3>
+  <div class="grid grid-3">
+    <div class="card-box lift"><b>집계에 특화</b><p class="text-sm text-muted mt-sm">수억 행의 합계·평균도 수 초 내 처리. 행 단위 수정이 잦은 업무에는 맞지 않습니다.</p></div>
+    <div class="card-box lift"><b>읽은 양만큼 과금</b><p class="text-sm text-muted mt-sm">쿼리가 <b>스캔한 바이트</b> 기준. 필요한 컬럼만 선택하면 비용이 줄어듭니다. <code class="i">SELECT *</code>는 사용하지 않습니다.</p></div>
+    <div class="card-box lift"><b>세분화된 권한</b><p class="text-sm text-muted mt-sm">프로젝트·데이터셋·테이블 단위로 읽기·쓰기·실행 권한을 나눠 부여합니다.</p></div>
+  </div>
+</section>
+
+<!-- ====================================================== 2-3 -->
+<section id="s2-3" class="content-section">
+  <span class="part-tag demo">2교시</span>
+  <h2 class="section-header">2-3. 서비스 계정과 키</h2>
+  <p class="lead-text">백엔드는 프로그램이므로 사람 계정 대신 <b>프로그램 전용 계정(서비스 계정)</b>으로 인증합니다. 이때 사용하는 인증 파일이 <b>키 파일(JSON)</b>입니다.</p>
+
+  <div class="vs">
+    <div class="card-box"><h4>👤 사람 계정</h4><p class="text-sm">내 사번 계정. EAP·사내 시스템에 로그인해서 <b>데이터를 요청하고 키를 내려받을 때</b> 사용.</p></div>
+    <div class="card-box" style="border-top:5px solid var(--brand);"><h4>🤖 서비스 계정 + 키 파일</h4><p class="text-sm"><b>EAP에서 내려받은 키 파일</b>. DBeaver·백엔드 코드 같은 <b>프로그램</b>이 이 파일로 BigQuery에 로그인합니다. 파일만으로 로그인할 수 있으므로 <b>비밀번호와 같이 관리</b>해야 합니다.</p></div>
+  </div>
+
+  <h3 class="sub"><span class="ico">🔍</span>키 파일(JSON) 구성</h3>
+  <div class="keyjson">
+    <div><b>"type"</b><span>service_account: 서비스 계정 키</span></div>
+    <div><b>"project_id"</b><span>키가 속한 프로젝트</span></div>
+    <div><b>"client_email"</b><span>서비스 계정 주소 (권한 부여 대상)</span></div>
+    <div><b>"private_key_id"</b><span>키 번호: 폐기할 키를 식별할 때 사용</span></div>
+    <div class="secret"><b>"private_key"</b><span><b>비밀키 본문.</b> 화면·메일·메신저·Copilot에 붙여넣지 않습니다</span></div>
+  </div>
+
+  <h3 class="sub"><span class="ico">🛡</span>참고: BigQuery 권한 개념 (EAP 키의 권한은 EAP가 관리)</h3>
+  <p class="text-sm text-muted">EAP에서 받은 키는 <b>승인된 내 데이터셋의 뷰를 조회</b>하는 용도로, 권한을 직접 설정할 일은 없습니다. 아래 표는 조회용 키가 읽기만 가능한 이유를 이해하기 위한 참고 자료입니다.</p>
+  <div class="table-wrap">
+  <table class="table-custom">
+    <tr><th>역할</th><th>무엇을 할 수 있나</th><th>어디에 주나</th><th>조회용 키</th></tr>
+    <tr><td><b>BigQuery 데이터 뷰어</b><br><span class="muted-note">roles/bigquery.dataViewer</span></td><td>테이블 읽기</td><td>해당 <b>데이터세트</b>만</td><td class="yes">부여</td></tr>
+    <tr><td><b>BigQuery 작업 사용자</b><br><span class="muted-note">roles/bigquery.jobUser</span></td><td>쿼리 실행(작업 생성)</td><td>쿼리 실행 프로젝트</td><td class="yes">부여</td></tr>
+    <tr><td>BigQuery 데이터 편집자</td><td>테이블 쓰기·삭제</td><td>적재 담당(EAP)</td><td class="no">주지 않음</td></tr>
+    <tr><td>BigQuery 관리자 / 프로젝트 소유자</td><td>전부</td><td>관리자</td><td class="no">절대 주지 않음</td></tr>
+  </table>
+  </div>
+
+  <h3 class="sub"><span class="ico">🔑</span>키 보관 원칙</h3>
+  <div class="grid grid-2">
+    <ul class="check">
+      <li>키 파일은 <b>코드 폴더 밖</b>에 둔다 (교육에서는 <code class="i">심화교육</code> 폴더 최상위, <code class="i">시연키트</code> 안에는 두지 않음)</li>
+      <li>폴더를 <b>압축·공유할 때 키 파일은 반드시 빼기</b> (파일 이름에 사번이 들어 있고, 파일만 있으면 로그인됩니다)</li>
+      <li>메일·메신저·공유폴더로 <b>복사해서 전달하지 않는다</b> (필요한 사람은 따로 발급)</li>
+      <li><b>HTML·JS 화면 코드에 넣지 않는다</b></li>
+      <li><b>Copilot 등 AI에 내용을 붙여넣지 않는다</b></li>
+    </ul>
+    <ul class="check">
+      <li>코드에는 경로만, 경로는 <code class="i">.env</code> 설정 파일에 (Git 제외)</li>
+      <li>조회용·적재용 키를 <b>분리</b>하고 조회용은 최소 권한만</li>
+      <li>정기 교체(예: 90일) · 담당자 변경 시 · 유출 의심 시 <b>즉시 폐기</b></li>
+    </ul>
+  </div>
+  <div class="danger">🚨 <b>키를 잘못 전달한 경우:</b> 메시지를 삭제해도 받은 사람은 그 파일로 로그인할 수 있습니다. <b>즉시 EAP 운영 담당에 키 폐기·재발급</b>을 요청합니다. 폐기된 키는 바로 사용할 수 없게 됩니다.</div>
+</section>
+
+<!-- ====================================================== 2-4 -->
+<section id="s2-4" class="content-section">
+  <span class="part-tag demo">2교시 · 시연 B</span>
+  <h2 class="section-header">2-4. DBeaver로 데이터 확인</h2>
+  <p class="lead-text">코드 작성 전에 <b>DB 도구로 데이터를 먼저 확인</b>합니다. EAP에서 받은 키 파일로 DBeaver에 연결하면 내 데이터셋의 뷰를 조회할 수 있습니다. 여기서 확인한 <b>컬럼 목록</b>을 Copilot 요청에 사용합니다.</p>
+
+  <div class="grid grid-2">
+    <div class="step-box">
+      <h4>🔌 DBeaver 연결 6단계</h4>
+      <ol>
+        <li><strong>새 연결 만들기:</strong> DBeaver 왼쪽 위 <b>플러그(새 데이터베이스 연결)</b> 아이콘 → 목록에서 <b>Google BigQuery</b> 선택 → 다음.</li>
+        <li><strong>연결 정보 입력:</strong> Project에 <code class="i">pjt-lge-edl-user</code>, 인증 방식은 <b>서비스 계정(키 파일)</b>을 고르고 <b>EAP에서 받은 키 파일</b>을 첨부합니다.</li>
+        <li><strong>연결 테스트:</strong> 처음이면 <b>드라이버 다운로드</b> 창이 뜹니다 → 다운로드 → "연결됨"이 나오면 완료. <span class="note">(※ DBeaver 버전에 따라 메뉴 이름이 조금 다를 수 있습니다.)</span></li>
+        <li><strong>내 데이터셋 찾기:</strong> 탐색기에서 <code class="i">pjt-lge-edl-user</code> › <b>본인 사번 데이터셋</b>(<code class="i">ZU_사번</code>) › <b>뷰</b> 를 펼칩니다.</li>
+        <li><strong>컬럼 확인:</strong> 뷰를 더블클릭 → <b>속성(컬럼)</b> 탭에서 컬럼 이름·타입 확인. <b>개인정보 컬럼이 있는지</b>도 직접 확인합니다.</li>
+        <li><strong>SQL로 일부만 조회:</strong> SQL 편집기(<code class="i">Ctrl+]</code>)에서 <b>필요한 컬럼만</b> 골라 <code class="i">LIMIT</code>을 붙여 실행합니다.</li>
+      </ol>
+    </div>
+    <div>
+      <div class="ui-mockup db-mock">
+        <div class="ui-mockup-header"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="text-xs text-muted" style="margin-left:8px;">DBeaver 연결 설정 · Google BigQuery (화면 예시)</span></div>
+        <div class="db-body">
+          <div class="db-form">
+            <span class="l">Project</span><span class="in req">pjt-lge-edl-user</span>
+            <span class="l">인증 방식</span><span class="in">Service-based (서비스 계정 키)</span>
+            <span class="l">Key path</span><span class="in req">…\심화교육\sa-user-사번_key.json 📁</span>
+          </div>
+          <div class="db-btns"><span>연결 테스트</span><span class="p">완료</span></div>
+        </div>
+      </div>
+      <div class="ui-mockup db-mock mt-md">
+        <div class="ui-mockup-header"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="text-xs text-muted" style="margin-left:8px;">DBeaver · 데이터베이스 탐색기 (화면 예시)</span></div>
+        <div class="db-body">
+          <ul class="db-tree">
+            <li>▾ 🔌 <b>pjt-lge-edl-user</b><span class="url">https://www.googleapis.com/bigquery/v2:443</span>
+              <ul><li>▾ 🛢 pjt-lge-edl-user
+                <ul><li>▾ 📁 <span class="me">ZU_●●●●●●</span><span class="note">← 본인 사번 데이터셋</span>
+                  <ul><li>▸ 📂 테이블</li>
+                      <li>▾ 📂 뷰
+                        <ul><li>▸ 👁 <span class="hl">FV_edl__L0_SMIP__SI_VOC</span><span class="note">← 요청한 데이터</span></li></ul></li>
+                      <li>▸ 📂 인덱스 · 프로시저 · 데이터 타입</li></ul></li></ul></li></ul></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="sub"><span class="ico">🧮</span>필요한 컬럼만 선택 (57개 중 6개)</h3>
+  <p>시연용 VOC 뷰의 컬럼은 57개이며 대시보드에는 <b>6개</b>만 사용합니다. 읽는 컬럼이 적을수록 <b>속도, 비용, 개인정보 측면에서 유리</b>합니다.</p>
+  <div class="cols-use">
+    <div class="colgrp use"><h4>✅ 대시보드에 쓰는 6개</h4>
+      <span class="pill">P_PTT</span> 파티션 날짜(=접수일) · 기간 조건은 <b>이 컬럼으로</b><br>
+      <span class="pill">ETL_LOAD_TS</span> 배치 적재 시각 (UTC 저장)<br>
+      <span class="pill">VOC_NO</span> VOC 번호 · 건수는 <code class="i">COUNT(DISTINCT VOC_NO)</code><br>
+      <span class="pill">VOC_STATUS_NAME</span> 진행상태 이름<br>
+      <span class="pill">LARGE_CLASS_DESC</span> 대분류 이름 <span class="text-muted">(필요하면 MID·SMALL_CLASS_DESC)</span><br>
+      <span class="pill">TGET_DEPT_NAME</span> 대상 부서 이름
+      <p class="why" style="margin-bottom:0">같은 VOC 번호가 2행 이상인 경우가 있어 <b>행 수와 VOC 건수가 다릅니다</b>. 건수 기준을 먼저 정합니다(1-7 지표 정의).</p></div>
+    <div class="colgrp"><h4>🚫 지금은 쓰지 않는 51개</h4>
+      <b class="text-sm">자유서술: 조회·화면 표시 금지</b>
+      <p class="why"><span class="pill no">CONFIRM_DESC</span><span class="pill no">TREAT_BACK_DETAIL</span><span class="pill no">TGET_BACK_DETAIL</span><span class="pill no">TGET_APPR_DESC</span><span class="pill no">CONFIRM_CANCEL_DESC</span><br>직접 입력한 문장이라 개인정보가 포함될 수 있습니다.</p>
+      <b class="text-sm">코드 컬럼</b>
+      <p class="why"><span class="pill">VOC_STATUS</span><span class="pill">VOC_LARGE_CLASS</span><span class="pill">…_DEPT_CODE</span><span class="pill">PRODUCT_CODE</span> … 이름 컬럼(…_NAME, …_DESC)으로 충분</p>
+      <b class="text-sm">시스템 관리용 · 예비</b>
+      <p class="why" style="margin-bottom:0"><span class="pill">INTERFACE_ID</span><span class="pill">GLOBAL_UNIQUE_ID</span><span class="pill">BAM_SEQUENCE_ID</span><span class="pill">TRANSFER_…</span><span class="pill">ATTRIBUTE1~20</span> … 의미 확인 전에는 사용하지 않음</p></div>
+  </div>
+
+  <h3 class="sub"><span class="ico">💰</span>스캔량 비교: 같은 뷰, 쿼리에 따라 최대 380배 차이</h3>
+  <p class="text-sm text-muted">시연용 VOC 뷰에서 드라이런으로 측정한 값입니다(2026년 10월 기준, 데이터가 늘면 증가).</p>
+  <div class="scanbars">
+    <div class="scanbar bad"><span class="lb">❌ <code class="i">SELECT * … LIMIT 200</code> (데이터 탭)</span><span class="tr"><i style="width:100%"></i></span><b>45.5 MB</b></div>
+    <div class="scanbar"><span class="lb">대분류별 건수 · 기간 조건 없음</span><span class="tr"><i style="width:8.6%"></i></span><b>3.9 MB</b></div>
+    <div class="scanbar"><span class="lb">기간 조건을 <code class="i">RCPT_DATE</code>로</span><span class="tr"><i style="width:2.1%"></i></span><b>0.97 MB</b></div>
+    <div class="scanbar best"><span class="lb">✅ 기간 조건을 파티션 <code class="i">P_PTT</code>로</span><span class="tr"><i style="width:.6%"></i></span><b>0.12 MB</b></div>
+  </div>
+  <div class="tipbox"><b>파티션(Partition)</b>은 테이블을 날짜별로 나눠 저장하는 방식입니다. <code class="i">WHERE P_PTT BETWEEN …</code>처럼 파티션 컬럼으로 조건을 걸면 BigQuery가 <b>해당 날짜 구간만</b> 읽습니다. 같은 기간이라도 <code class="i">RCPT_DATE</code>로 조건을 걸면 전체를 읽은 뒤 거릅니다.</div>
+
+  <div class="vs mt-md">
+    <div>
+      <div class="code-title">✅ 필요한 컬럼 + 파티션 조건 (SQL 편집기)</div>
+      <div class="code"><span class="k">SELECT</span> P_PTT, VOC_STATUS_NAME, LARGE_CLASS_DESC
+<span class="k">FROM</span> `pjt-lge-edl-user.ZU_사번.FV_edl__L0_SMIP__SI_VOC`
+<span class="k">WHERE</span> P_PTT <span class="k">BETWEEN</span> <span class="s">'2026-10-01'</span> <span class="k">AND</span> <span class="s">'2026-10-23'</span>
+<span class="k">LIMIT</span> 100;
+
+<span class="c">-- 최근 4주 대분류별 VOC 건수</span>
+<span class="k">SELECT</span> LARGE_CLASS_DESC, <span class="k">COUNT</span>(<span class="k">DISTINCT</span> VOC_NO) <span class="k">AS</span> voc_cnt
+<span class="k">FROM</span> `pjt-lge-edl-user.ZU_사번.FV_edl__L0_SMIP__SI_VOC`
+<span class="k">WHERE</span> P_PTT >= <span class="k">DATE_SUB</span>(<span class="k">CURRENT_DATE</span>(<span class="s">'Asia/Seoul'</span>), <span class="k">INTERVAL</span> 28 <span class="k">DAY</span>)
+<span class="k">GROUP BY</span> 1 <span class="k">ORDER BY</span> 2 <span class="k">DESC</span>;</div>
+      <p class="text-sm text-muted">프로젝트 이름에 하이픈(-)이 있어 이름 전체를 <b>백틱(`)</b>으로 감쌉니다.</p>
+    </div>
+    <div>
+      <div class="code-title">⚠️ 주의: 뷰의 "데이터" 탭 바로 열기 · SELECT *</div>
+      <div class="code"><span class="c">-- DBeaver가 내부적으로 실행하는 것과 같음</span>
+<span class="k">SELECT</span> * <span class="k">FROM</span> `…FV_edl__L0_SMIP__SI_VOC` <span class="k">LIMIT</span> 200</div>
+      <p class="text-sm text-muted">BigQuery는 <b>LIMIT을 붙여도 57개 컬럼을 모두 읽습니다.</b> 자유서술 컬럼도 화면에 표시되므로 개인정보가 포함된 뷰에서는 사용하지 않습니다.</p>
+    </div>
+  </div>
+
+  <div class="warn">🔒 <b>개인정보 포함 데이터셋:</b> 조회 결과를 화면 공유, 캡처, 엑셀 내보내기로 반출하지 않습니다. 시연도 컬럼 확인과 건수·집계 위주로 진행합니다.</div>
+
+  <h3 class="sub"><span class="ico">🧯</span>문제 해결</h3>
+  <div class="table-wrap">
+  <table class="table-custom">
+    <tr><th style="width:28%">증상</th><th>확인할 것</th></tr>
+    <tr><td>드라이버 다운로드 실패</td><td>사내망 프록시 → DBeaver 설정의 네트워크 프록시, 또는 IT 문의</td></tr>
+    <tr><td>연결 테스트에서 인증 오류</td><td>키 파일 경로, EAP에서 받은 <b>최신</b> 키인지, 파일이 손상되지 않았는지</td></tr>
+    <tr><td>내 사번 데이터셋이 안 보임</td><td>EAP 요청이 <b>승인 완료</b>됐는지, Project 이름 오타, 탐색기 새로고침(F5)</td></tr>
+    <tr><td>뷰는 보이는데 조회 시 권한 오류</td><td>Step 2에서 고른 사용항목 범위인지, 승인 상태 재확인</td></tr>
+    <tr><td>SQL 문법 오류</td><td>이름 전체를 백틱(`)으로 감쌌는지, 컬럼 이름 철자</td></tr>
+  </table>
+  </div>
+  <div class="tipbox">DBeaver에 연결한 <b>같은 키 파일</b>을 2-5에서 코드(<code class="i">.env</code>)에도 사용합니다.</div>
+</section>
+
+<!-- ====================================================== 2-5 -->
+<section id="s2-5" class="content-section">
+  <span class="part-tag demo">2교시 · 시연 C</span>
+  <h2 class="section-header">2-5. GCP 키 기반 인증 · 조회</h2>
+  <p class="lead-text">DBeaver에서 사용한 <b>같은 키</b>로 코드에서 인증합니다. 대시보드 개발 전에 <b>키로 뷰를 조회할 수 있는지</b> 먼저 확인합니다. 단계를 나눠 확인하면 문제 위치를 빠르게 찾을 수 있습니다.</p>
+
+  <h3 class="sub"><span class="ico">🛠</span>① 준비: 설치와 설정 (최초 1회)</h3>
+  <div class="prompt-box"><span class="prompt-label">터미널</span>pip install -r requirements.txt
+copy .env.example .env</div>
+  <div class="code-title">.env: 환경별 설정 값</div>
+  <div class="code"><span class="c"># EAP에서 받은 키 파일 (DBeaver에 첨부한 그 파일). ..\ = 시연키트의 한 단계 위 = 심화교육 폴더</span>
+GCP_KEY_PATH=<span class="s">..\sa-user-사번_key.json</span>
+<span class="c"># 프로젝트.데이터셋(본인 사번).뷰 (DBeaver 탐색기의 이름)</span>
+BQ_TABLE=<span class="s">pjt-lge-edl-user.ZU_사번.FV_edl__L0_SMIP__SI_VOC</span>
+<span class="c"># EAP 데이터셋 위치(서울). 비워 두면 자동 판단</span>
+BQ_LOCATION=<span class="s">asia-northeast3</span>
+<span class="c"># 쿼리 1회 최대 스캔량(1GB). 초과 시 실행 전에 거부</span>
+MAX_BYTES_BILLED=<span class="s">1000000000</span></div>
+
+  <h3 class="sub"><span class="ico">✅</span>② 연결 테스트 4단계</h3>
+  <div class="prompt-box"><span class="prompt-label">터미널</span>python step1_test_connection.py</div>
+  <div class="term"><span class="dim">============================================================
+ BigQuery 연결 테스트
+============================================================</span>
+<span class="ok">① 키 파일 OK</span>
+   서비스 계정 : sa-user-사번@pjt-lge-edl-user.iam.gserviceaccount.com
+   키 프로젝트 : pjt-lge-edl-user
+   키 ID       : 3f9a1c2e…  <span class="dim">(비밀키 본문은 출력하지 않음)</span>
+<span class="ok">② 로그인 + 쿼리 실행 OK</span>  (작업 프로젝트: pjt-lge-edl-user, 결과: 1)
+<span class="ok">③ 뷰 OK</span> : pjt-lge-edl-user.ZU_사번.FV_edl__L0_SMIP__SI_VOC
+   행 수      : 뷰는 메타정보에 행 수가 없습니다 → ④ 스캔량 참고, 또는 DBeaver에서 COUNT(*)로 확인
+   위치       : asia-northeast3
+   컬럼 (57개):
+     - P_PTT (DATE)
+     - ETL_LOAD_TS (TIMESTAMP)
+     - VOC_NO (STRING)
+     - …  <span class="dim">(DBeaver 컬럼 탭과 같은 목록 = Copilot에 줄 설명서)</span>
+<span class="ok">④ 드라이런 OK</span> : COUNT(*) 쿼리는 약 0.00 MB 를 스캔합니다 (상한 954 MB)
+<span class="dim">------------------------------------------------------------</span>
+모든 단계 통과. 같은 키로 DBeaver와 코드에서 조회할 수 있습니다.</div>
+  <p class="muted-note">※ 화면 예시의 값은 예시입니다.</p>
+
+  <div class="table-wrap">
+  <table class="table-custom">
+    <tr><th>단계</th><th>확인하는 것</th><th>실패하면 대개</th></tr>
+    <tr><td>① 키 파일</td><td>파일 경로, 어떤 서비스 계정인지</td><td>.env 경로 오타, 키를 받지 않음</td></tr>
+    <tr><td>② 로그인 + SELECT 1</td><td>인증, 네트워크, <b>작업 사용자</b> 권한</td><td>프록시/SSL, 키 폐기, jobUser 없음</td></tr>
+    <tr><td>③ 테이블/뷰 정보</td><td>읽기 권한, 이름, <b>컬럼 목록</b></td><td>403 권한 없음, 404 이름 틀림·승인 전</td></tr>
+    <tr><td>④ 드라이런</td><td>쿼리 실행 가능 여부, 예상 스캔량</td><td>권한·문법 오류(400·403)</td></tr>
+  </table>
+  </div>
+
+  <h3 class="sub"><span class="ico">💻</span>핵심 코드: 키로 클라이언트 생성</h3>
+  <div class="code"><span class="k">from</span> google.cloud <span class="k">import</span> bigquery
+<span class="k">from</span> google.oauth2 <span class="k">import</span> service_account
+
+<span class="c"># 1) 키 파일로 '누구인지' 증명 (경로는 .env 에서 읽음)</span>
+creds = service_account.Credentials.from_service_account_file(KEY_PATH)
+client = bigquery.Client(credentials=creds, project=creds.project_id)
+
+<span class="c"># 2) 값은 문자열로 붙이지 말고 '파라미터'로 (SQL 인젝션 방지)</span>
+config = bigquery.QueryJobConfig(
+    query_parameters=[bigquery.ScalarQueryParameter(<span class="s">"from_date"</span>, <span class="s">"DATE"</span>, from_d)],
+    maximum_bytes_billed=1_000_000_000,   <span class="c"># 3) 1회 스캔 상한</span>
+)
+rows = client.query(SQL, job_config=config).result()</div>
+</section>
+
+<!-- ====================================================== 2-6 -->
+<section id="s2-6" class="content-section">
+  <span class="part-tag demo">2교시 · 시연 D</span>
+  <h2 class="section-header">2-6. 조회 데이터를 대시보드에 연결</h2>
+  <p class="lead-text">백엔드가 EAP VOC 뷰에서 집계한 숫자를 <b>API(JSON)</b>로 내주고, 화면은 <b>데이터를 가져오는 부분만</b> 바꿔 그 API를 호출합니다.</p>
+
+  <div class="pipe">
+    <div class="stage"><div class="no">화면</div><h4>📊 dashboard_voc.html</h4><p>열리면 <code class="i">GET /api/voc?from=2026-08-04&amp;to=2026-10-26</code></p></div>
+    <div class="stage hl"><div class="no">백엔드</div><h4>⚙️ server.py + voc_api.py</h4><p>캐시 확인 → 없으면 쿼리 5개(KPI·주별·대분류·진행상태·대상 부서) 실행 → JSON</p></div>
+    <div class="stage"><div class="no">저장소</div><h4>🗄 BigQuery (VOC 뷰)</h4><p>P_PTT 기간 조건·스캔 상한이 걸린 집계 쿼리 실행</p></div>
+  </div>
+
+  <h3 class="sub"><span class="ico">📦</span>API 응답: 원본 행이 아닌 집계값</h3>
+  <div class="code">{
+  <span class="s">"kpi"</span>: { <span class="s">"total"</span>: 10850, <span class="s">"row_cnt"</span>: 10862, <span class="s">"last_rcpt"</span>: <span class="s">"2026-10-23"</span>, <span class="s">"last_load_kst"</span>: <span class="s">"2026-10-26 06:20"</span> },
+  <span class="s">"by_week"</span>:   [ { <span class="s">"week"</span>: <span class="s">"2026-08-03"</span>, <span class="s">"cnt"</span>: 912 }, … ],
+  <span class="s">"by_large"</span>:  [ { <span class="s">"name"</span>: <span class="s">"(대분류명)"</span>, <span class="s">"cnt"</span>: 2410 }, … ],
+  <span class="s">"by_status"</span>: [ … ],  <span class="s">"by_dept"</span>: [ … ],
+  <span class="s">"meta"</span>: { <span class="s">"source"</span>: <span class="s">"bigquery"</span>, <span class="s">"queried_at"</span>: <span class="s">"2026-10-26 09:12:05"</span>, <span class="s">"cached"</span>: false, <span class="s">"bytes_processed"</span>: 2097152 }
+}</div>
+  <p class="muted-note">숫자는 예시입니다. 건수는 <code class="i">COUNT(DISTINCT VOC_NO)</code> 기준이라 행 수(row_cnt)와 다를 수 있습니다. meta의 출처·조회 시각과 kpi의 마지막 배치 적재 시각은 화면 상단에 항상 표시합니다(1-7 운영 관점 ②).</p>
+
+  <h3 class="sub"><span class="ico">🔁</span>연동 전 → 연동 후: 같은 화면, 데이터만 연결</h3>
+  <div class="vs">
+    <div class="card-box bad">
+      <h4>연동 전: 파일을 바로 열기</h4>
+      <p class="text-sm"><code class="i">dashboard_voc.html</code>을 더블클릭해 열면 데이터를 받아 올 서버가 없어 <b>틀만 있는 화면</b>(숫자 "–")이 보입니다.</p>
+    </div>
+    <div class="card-box good">
+      <h4>연동 후: 서버 주소로 열기</h4>
+      <p class="text-sm"><code class="i">python server.py</code> 후 <code class="i">http://127.0.0.1:8940</code>으로 열면 <b>같은 화면</b>에 EAP VOC 데이터가 채워집니다.</p>
+    </div>
+  </div>
+  <div class="code-title">화면 코드에서 달라지는 부분 (기본교육 MVP → 연동)</div>
+  <div class="code"><span class="c">// ▼▼▼ 데이터 가져오는 부분 ▼▼▼</span>
+<span class="del">- const DATA = { kpi: { total: 10850 }, by_week: [ … ], by_large: [ … ] };</span><span class="del">- async function loadData() { return DATA; }</span><span class="add">+ async function loadData(from, to, force) {</span><span class="add">+   const res = await fetch(`/api/voc?from=${from}&amp;to=${to}${force ? '&amp;refresh=1' : ''}`);</span><span class="add">+   const body = await res.json();</span><span class="add">+   if (!res.ok) throw new Error(body.error);</span><span class="add">+   return body;</span><span class="add">+ }</span><span class="c">// ▲▲▲ 데이터 가져오는 부분 끝 ▲▲▲</span>
+<span class="c">// 차트·카드를 그리는 나머지 코드는 변경 없음</span></div>
+
+  <h3 class="sub"><span class="ico">🤖</span>Copilot 요청 프롬프트 (내 데이터에 바로 쓰는 버전)</h3>
+  <div class="danger">🚫 Copilot에 <b>전달하지 않는 정보</b>: 키 파일 내용, 실제 데이터 행, 실제 사번·뷰 이름(필요하면 예시값으로)</div>
+  <div class="tipbox"><b>사용 방법:</b> <b>[ ]</b> 부분만 내 데이터로 바꿔 붙여넣습니다. 컬럼 이름·타입은 DBeaver 컬럼 탭(또는 step1 ③)에서 복사합니다. 처음에는 ① → ② 순서로, 이후 수정은 ③·④를 사용합니다.</div>
+
+  <div class="grid grid-2">
+    <div class="prompt-box"><span class="prompt-label">① 백엔드 만들기</span>BigQuery 뷰를 조회해서 대시보드에 집계값을 내려주는 Python 서버를 만들고 싶어.
+데이터와 키는 첨부하지 않고 컬럼 정보만 알려 줄게.
+
+- 뷰 이름: [pjt-lge-edl-user.ZU_사번.뷰이름]
+- 쓸 컬럼: [컬럼명(타입), 컬럼명(타입), …]
+- 기간 조건 컬럼: [예: P_PTT]
+- 보고 싶은 것: [예: 주별 건수 추이, 유형별 TOP 10]
+
+키 경로와 뷰 이름은 .env에서 읽고, 키가 화면에 노출되지 않게 해 줘.
+필요한 컬럼만 조회하고, 하루 한 번 갱신되는 데이터라 1시간 캐시해 줘.</div>
+
+    <div class="prompt-box"><span class="prompt-label">② 화면 연결</span>첨부한 HTML은 데이터가 코드 안에 들어 있는 대시보드야.
+디자인은 그대로 두고, 화면을 열 때 [/api/주소]에서 데이터를 받아 그리도록 바꿔 줘.
+
+API 응답 예시:
+[서버 응답 JSON 붙여넣기 (값은 예시여도 됨)]
+
+화면 위쪽에 데이터 기준 시각도 작게 표시해 줘.</div>
+
+    <div class="prompt-box"><span class="prompt-label">③ 오류 해결</span>받은 코드를 실행했더니 아래 오류가 났어. 원인과 고칠 부분을 알려 줘.
+
+[오류 메시지 붙여넣기 (키 경로·사번은 *** 로 가리기)]</div>
+
+    <div class="prompt-box"><span class="prompt-label">④ 지표 추가</span>지금 대시보드에 [추가할 지표, 예: 대상 부서별 건수 TOP 8]를 넣고 싶어.
+쓸 컬럼은 [컬럼명(타입)]이야.
+기존 API 응답 형식은 유지하고 항목만 추가해 줘.</div>
+  </div>
+
+  <p class="muted-note">위 템플릿에 예시 값을 넣은 것이 시연에서 쓴 프롬프트입니다. 결과가 부족하면 아래 상세 버전처럼 조건(보안, 비용, 배치 주기 등)과 이유를 더 적습니다.</p>
+
+  <details class="more">
+    <summary>시연에 사용한 상세 프롬프트 보기</summary>
+    <div>
+  <div class="prompt-box"><span class="prompt-label">상세 ① 백엔드 만들기 (EAP VOC 뷰)</span>[상황]
+EAP에서 VOC 데이터 사용요청이 승인되어 BigQuery에 내 사번 데이터셋과 뷰가 생겼어. 이 뷰를 조회해 주간 VOC 현황 대시보드에 집계값을 내려주는 Python 백엔드를 만들려고 해.
+뷰에는 컬럼이 57개 있지만 대시보드에는 아래 6개만 쓸 거야. 데이터와 키는 첨부하지 않아.
+
+[뷰 정보]
+- 뷰 이름은 .env 의 BQ_TABLE 에 있어 (예: pjt-lge-edl-user.ZU_사번.FV_edl__L0_SMIP__SI_VOC)
+- P_PTT(DATE): 접수일 기준 파티션 컬럼
+- ETL_LOAD_TS(TIMESTAMP): EAP 배치 적재 시각, UTC로 저장됨
+- VOC_NO(STRING): VOC 번호. 같은 번호가 2행 이상인 경우가 있음
+- VOC_STATUS_NAME, LARGE_CLASS_DESC, TGET_DEPT_NAME(STRING): 진행상태, 대분류, 대상 부서 이름
+
+[화면에 필요한 데이터]
+화면은 GET /api/voc?from=YYYY-MM-DD&to=YYYY-MM-DD 로 아래 값을 받아.
+- kpi: VOC 건수(고유 VOC 번호 기준), 최신 접수일, 마지막 배치 적재 시각(한국시간)
+- by_week: 주별(월요일 시작) 건수
+- by_large, by_status, by_dept: 건수 상위 8개
+
+[데이터 특성과 제약]
+- EAP는 하루 한 번 새벽에 배치로 적재돼서, 결과는 1시간 캐시해도 돼
+- 기간 조건은 파티션 컬럼 P_PTT 로 걸어야 스캔량이 줄어들어. 조건 값은 쿼리 파라미터로 넘겨 줘
+- ..._DESC, ..._DETAIL 같은 자유서술 컬럼에는 개인정보가 섞일 수 있어서 조회하면 안 돼. 위 6개 외의 컬럼은 쓰지 말아 줘
+- 키 경로는 .env 의 GCP_KEY_PATH 에 있고, 키 내용·경로가 응답에 나오면 안 돼
+- maximum_bytes_billed 로 스캔 상한을 두고, 응답 meta 에 조회 시각·캐시 여부·스캔 바이트를 넣어 줘
+- 서버는 내 PC(127.0.0.1)에서만 열고, 대시보드 화면 외의 파일은 내보내지 않아야 해 (.env·키 노출 방지)
+- 오류가 나면 화면에는 짧은 안내만, 자세한 내용은 터미널에 남겨 줘
+
+[결과물]
+server.py(서버·캐시)와 voc_api.py(집계 SQL) 두 파일로, 실행 방법과 함께 전체 코드를 보여 줘.</div>
+
+  <div class="tipbox">상세 ①로 만든 결과가 시연키트의 <code class="i">server.py</code>·<code class="i">voc_api.py</code>와 화면 <code class="i">http://127.0.0.1:8940</code>입니다. 화면 상단의 <b>마지막 배치 적재</b> 표시가 1-5에서 설명한 배치 시각입니다.</div>
+
+  <div class="prompt-box"><span class="prompt-label">상세 ② 화면을 API에 연결</span>[상황]
+첨부한 dashboard_voc.html 은 VOC 현황 대시보드야. 지금은 숫자가 코드 안(const DATA = …)에 직접 들어 있어서 데이터가 바뀌어도 화면이 그대로야.
+이제 백엔드(server.py)가 /api/voc 로 집계값을 내려주니까, 화면을 열 때마다 이 API를 조회하도록 바꾸려고 해.
+화면 디자인과 차트 코드는 회의에서 이미 확정된 거라 그대로 두고 싶어.
+
+[API 응답 형식]
+{ kpi:{total, last_rcpt, last_load_kst}, by_week:[...], by_large:[...], by_status:[...], by_dept:[...], meta:{source, queried_at, cached} }
+
+[바꿀 내용]
+- 코드 안의 데이터(const DATA = …)를 지우고, 페이지가 열릴 때 /api/voc?from=..&to=.. 를 조회해서 그리기
+- 사용자가 숫자의 기준을 알 수 있게 화면 상단에 데이터 출처·최신 접수일·마지막 배치 적재 시각·조회 시각을 작게 표시
+- 캐시를 무시하고 다시 조회하는 "지금 다시 조회" 버튼 (refresh=1)
+- API 오류가 나면 빨간 안내 박스 표시
+
+[결과물]
+바뀐 부분만 보여 주고, 어디를 왜 바꿨는지 3줄로 설명해 줘.</div>
+
+  <div class="prompt-box"><span class="prompt-label">상세 ③ 오류가 날 때</span>[상황]
+BigQuery를 조회하는 server.py 를 실행했는데 아래 오류가 났어. 보안상 데이터와 키는 첨부하지 않고 오류 메시지만 붙여 넣을게.
+step1_test_connection.py 로 확인해 보니 ① 키 파일, ② 로그인은 통과했고 ③ 뷰 조회에서 실패했어.
+
+[오류 메시지]
+(터미널 내용 붙여넣기. 키 경로·프로젝트 ID는 *** 로 가리기)
+
+[요청]
+가능성이 높은 원인부터 순서대로 알려 주고, 각각 무엇을 확인하면 되는지 알려 줘.</div>
+    </div>
+  </details>
+
+  <div class="tipbox"><b>데이터를 첨부하지 않아도 되는 이유:</b> 조회 코드는 컬럼 이름과 타입을 기준으로 작성되고, 실제 값은 실행할 때 저장소에서 읽습니다.</div>
+</section>
+
+<!-- ====================================================== 2-7 -->
+<section id="s2-7" class="content-section">
+  <span class="part-tag demo">2교시 · 시연 E</span>
+  <h2 class="section-header">2-7. 데이터 갱신 · 권한 · 유지보수 유의사항</h2>
+  <p class="lead-text">연동 이후 운영 단계에서 확인할 내용입니다. 시연 장면 2가지와 운영 체크리스트로 구성됩니다.</p>
+
+  <h3 class="sub"><span class="ico">📈</span>장면 1. 일배치 적재 후 화면 반영</h3>
+  <div class="grid grid-3">
+    <div class="card-box num-card"><span class="n">1</span><h4>새벽 EAP 일배치</h4><p>근무시간 전에 전일 VOC가 뷰에 적재됩니다. 화면 상단 <b>마지막 배치 적재</b>가 오늘 새벽 시각으로 바뀝니다.</p></div>
+    <div class="card-box num-card"><span class="n">2</span><h4>화면 열기 · 새로고침</h4><p>"캐시 사용 · N분 전 결과". 캐시 1시간 동안은 BigQuery를 다시 조회하지 않고 같은 결과를 보여줍니다.</p></div>
+    <div class="card-box num-card"><span class="n">3</span><h4>다음 날 아침</h4><p>서버·화면을 고치지 않아도 <b>최신 접수일과 적재 시각이 바뀌고</b> 새 주 막대가 쌓입니다. <b>수동 작업 없음.</b></p></div>
+  </div>
+  <div class="info-box">화면의 최신성 = <b>EAP 적재 주기</b> + <b>캐시 시간</b>. EAP는 대부분 <b>근무시간 전 일배치</b>라, 캐시를 1시간으로 두어도 사용자는 차이를 못 느끼고 비용은 크게 줄어듭니다.</div>
+  <div class="tipbox">EAP에서 받은 키는 <b>조회 권한만</b> 있어 뷰의 데이터를 바꾸거나 지울 수 없습니다. 키가 유출되더라도 피해를 줄이기 위한 <b>최소 권한</b>입니다.</div>
+
+  <h3 class="sub"><span class="ico">🚫</span>장면 2. 화면 주소로 설정 파일 접근 시도</h3>
+  <div class="term"><span class="cmd">http://127.0.0.1:8940/.env</span>        → <span class="ng">404 not found</span>
+<span class="cmd">http://127.0.0.1:8940/voc_api.py</span>  → <span class="ng">404 not found</span>
+<span class="cmd">http://127.0.0.1:8940/</span>            → <span class="ok">200 대시보드</span></div>
+  <p>폴더 전체를 서빙하는 간이 서버(<code class="i">python -m http.server</code>, <code class="i">npx serve</code>)로 백엔드 폴더를 열면 <b>.env와 키까지 다운로드</b>될 수 있습니다. 백엔드는 <b>허용한 파일만</b> 내보내야 합니다.</p>
+
+  <h3 class="sub"><span class="ico">📋</span>운영 체크리스트</h3>
+  <div class="table-wrap">
+  <table class="table-custom">
+    <tr><th style="width:16%">영역</th><th>확인할 것</th><th style="width:24%">이렇게 정해 두기</th></tr>
+    <tr><td><b>갱신</b></td><td>EAP 적재 주기·시각, 적재 실패 시 알림, 화면에 기준일 표시</td><td>"새벽 일배치, 09시에 ETL_LOAD_TS가 오늘이 아니면 담당 확인"</td></tr>
+    <tr><td><b>권한</b></td><td>조회용/적재용 키 분리, 데이터세트 단위 권한, 화면 공유 범위(HOST)</td><td>조회키 = dataViewer + jobUser만</td></tr>
+    <tr><td><b>키 수명</b></td><td>발급자·보관 위치·교체일 기록, 담당자 변경 시 폐기</td><td>90일 교체, 키 대장 1장</td></tr>
+    <tr><td><b>비용</b></td><td>1회 스캔 상한, 캐시, SELECT * 금지, 큰 테이블은 날짜 파티션</td><td>상한 1GB, 캐시 5분~1시간</td></tr>
+    <tr><td><b>스키마 변경</b></td><td>EAP 컬럼명이 바뀌면 쿼리가 400 오류 → 변경 공지 받을 경로</td><td>변경 시 사전 공지 + step1 재실행</td></tr>
+    <tr><td><b>지표 정의</b></td><td>계산식은 백엔드 SQL 한 곳, 변경 이력 기록</td><td>지표 정의서 1장 + 변경일</td></tr>
+    <tr><td><b>배포</b></td><td>내 PC는 연습용. 팀이 쓰면 사내 서버로, 서버 담당과 협의</td><td>PC 꺼지면 화면도 꺼짐을 인지</td></tr>
+  </table>
+  </div>
+
+  <h3 class="sub"><span class="ico">🧯</span>오류별 확인 방법</h3>
+  <div class="table-wrap">
+  <table class="table-custom">
+    <tr><th>증상</th><th>원인</th><th>확인</th></tr>
+    <tr><td><b>403</b> Access Denied</td><td>권한 부족 / 스캔 상한 초과</td><td>키의 서비스 계정에 dataViewer·jobUser가 있는지, 쿼리 스캔량</td></tr>
+    <tr><td><b>404</b> Not found</td><td>테이블 ID 오타, 위치 불일치</td><td>DBeaver 탐색기의 이름과 비교, BQ_LOCATION</td></tr>
+    <tr><td><b>400</b> Bad request</td><td>컬럼명·타입 불일치</td><td>스키마 변경 여부, 쿼리의 컬럼명</td></tr>
+    <tr><td>invalid_grant</td><td>키 폐기, 계정 비활성, PC 시계 오차</td><td>키 대장 확인, 새 키 요청</td></tr>
+    <tr><td>SSL / 연결 시간 초과</td><td>사내망 프록시·인증서</td><td><code class="i">HTTPS_PROXY</code>, <code class="i">REQUESTS_CA_BUNDLE</code> 설정 (IT 문의)</td></tr>
+    <tr><td>화면이 옛날 숫자</td><td>캐시, 배치 지연</td><td>화면 칩의 "마지막 배치 적재·캐시", <code class="i">MAX(ETL_LOAD_TS)</code></td></tr>
+  </table>
+  </div>
+</section>
+
+<!-- ====================================================== 3-1 -->
+<section id="s3-1" class="content-section">
+  <span class="part-tag">마무리</span>
+  <h2 class="section-header">3-1. 핵심 정리</h2>
+  <div class="grid grid-1" style="display:grid;gap:12px;">
+    <div class="card-box lift num-card"><span class="n">1</span><h4>대시보드는 열 때마다 데이터를 조회한다.</h4><p>데이터를 화면 코드에 넣지 않고, 화면을 열 때 저장소에서 조회합니다.</p></div>
+    <div class="card-box lift num-card"><span class="n">2</span><h4>키는 백엔드에만 둔다.</h4><p>화면(HTML), 메일, AI 대화창에 키를 넣지 않습니다. 이 때문에 백엔드가 필요합니다.</p></div>
+    <div class="card-box lift num-card"><span class="n">3</span><h4>개인정보는 평가 후 연동한다.</h4><p>프라이버시센터 영향평가 → 약관포털 적법성평가 → EAP 비식별 적재 순서로 진행하고, 화면에는 집계값만 표시합니다.</p></div>
+    <div class="card-box lift num-card"><span class="n">4</span><h4>AI에는 데이터 대신 컬럼 정보를 준다.</h4><p>컬럼 이름·타입과 필요한 지표만 알려 주면 조회 코드를 받을 수 있습니다.</p></div>
+    <div class="card-box lift num-card"><span class="n">5</span><h4>만들고 끝이 아니라 운영까지 챙긴다.</h4><p>지표 정의, 갱신 주기, 권한, 비용 상한, 담당자를 개발 전에 정하고, 기존 시스템 숫자와 맞춘 뒤 엽니다. 쓰지 않는 화면은 정리합니다.</p></div>
+  </div>
+</section>
+
+<!-- ====================================================== 3-2 -->
+<section id="s3-2" class="content-section">
+  <span class="part-tag">마무리</span>
+  <h2 class="section-header">3-2. 용어 정리</h2>
+  <div class="table-wrap">
+  <table class="table-custom">
+    <tr><th style="width:22%">용어</th><th>설명</th></tr>
+    <tr><td>프론트엔드</td><td>사용자가 보는 화면 (HTML·CSS·JS)</td></tr>
+    <tr><td>백엔드 / API</td><td>화면의 요청을 받아 데이터를 조회해 주는 프로그램 / 요청 주소와 응답 형식에 대한 규칙</td></tr>
+    <tr><td>EAP</td><td>Enterprise Analytics Platform. 데이터를 찾고 사용을 요청하면, 승인 후 BigQuery의 내 데이터셋에 뷰로 제공하는 사내 데이터 플랫폼</td></tr>
+    <tr><td>사번 데이터셋</td><td>EAP 승인 후 <code class="i">pjt-lge-edl-user</code> 프로젝트에 본인 사번 이름(예: <code class="i">ZU_사번</code>)으로 생기는 내 데이터 공간</td></tr>
+    <tr><td>뷰 (View)</td><td>원본 테이블을 조회하는 저장된 쿼리. 데이터를 복사하지 않고 승인된 범위만 표시</td></tr>
+    <tr><td>DBeaver</td><td>여러 DB에 연결해 데이터를 보고 SQL을 실행하는 무료 DB 도구. 키 파일로 BigQuery에 연결</td></tr>
+    <tr><td>API 연동</td><td>정해진 주소·조건·인증으로 요청하면 정해진 모양으로 답을 받는 방식 (필요할 때마다 질문)</td></tr>
+    <tr><td>엔드포인트 / 토큰</td><td>API의 주소 / API 호출 시 사용하는 인증값(유효기간 있음)</td></tr>
+    <tr><td>상태 코드</td><td>API 응답의 첫 줄 숫자 (200 성공, 401 인증 실패, 403 권한 없음 등)</td></tr>
+    <tr><td>DB to DB 연동</td><td>원천 DB의 데이터를 정해진 주기로 분석용 DB에 옮겨 담는 방식 (EAP → BigQuery)</td></tr>
+    <tr><td>개인정보 영향평가 / 적법성평가</td><td>개인정보가 있는 데이터를 사용하기 전 거치는 절차. 프라이버시센터 영향평가 완료 후 약관포털에서 데이터 사용 적법성평가</td></tr>
+    <tr><td>GCP / BigQuery</td><td>구글 클라우드 / 그 안의 대용량 집계용 데이터베이스</td></tr>
+    <tr><td>서비스 계정 / 키</td><td>프로그램 전용 계정 / 그 계정의 인증 파일(JSON)</td></tr>
+    <tr><td>IAM 역할</td><td>"누가 무엇을 할 수 있는가" 권한 묶음 (예: 데이터 뷰어)</td></tr>
+    <tr><td>스키마</td><td>테이블의 컬럼 이름·타입 목록</td></tr>
+    <tr><td>드라이런</td><td>쿼리를 실제로 돌리지 않고 스캔량만 미리 계산</td></tr>
+    <tr><td>배치 / 일배치</td><td>정해진 시각에 모아서 한꺼번에 처리 / 하루 한 번 도는 배치. EAP는 대부분 근무시간 전 일배치</td></tr>
+    <tr><td>ETL_LOAD_TS</td><td>EAP 배치가 그 행을 적재한 시각 (UTC로 저장 → 한국시간은 +9시간)</td></tr>
+    <tr><td>파티션 (P_PTT)</td><td>테이블을 날짜별 칸으로 나눈 것. 파티션 컬럼으로 조건을 걸면 그 칸만 읽어 비용이 줄어듦</td></tr>
+    <tr><td>캐시</td><td>같은 질문의 답을 잠시 기억해 두고 재사용</td></tr>
+    <tr><td>.env</td><td>키 경로·테이블 ID처럼 바뀌는 설정을 모아 두는 파일 (공유 금지)</td></tr>
+  </table>
+  </div>
+
+  <div class="closing-line">
+    <p class="k">오늘의 한 문장</p>
+    <p class="t"><span>한 번 연결해 두면,</span><br><span>내일 아침 숫자는</span> <span><em>알아서</em> 바뀝니다.</span></p>
+    <p class="s"><span>키는 서버에,</span> <span>화면에는 집계값만.</span></p>
+  </div>
+  <p class="muted-note mt-md">이 자료의 수치와 화면 예시 값은 모두 예시입니다. 로고 이미지 외에는 외부 주소를 불러오지 않는 단일 HTML이라 사내망·오프라인에서도 열립니다(로고를 불러올 수 없으면 글자 로고로 표시).</p>
+</section>
+
+</main>
+
+<button id="to-top" aria-label="맨 위로" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</button>
+
+<script>
+// 1) 사이드바 아코디언
+// 로고 이미지를 불러오지 못하면(사내망 차단·오프라인) 글자 로고로 대체
+document.querySelectorAll('img[alt="LG Logo"]').forEach(img => {
+  const fallback = () => { img.style.display = 'none'; const f = img.nextElementSibling; if (f) f.hidden = false; };
+  if (img.complete && img.naturalWidth === 0) fallback(); else img.addEventListener('error', fallback);
+});
+function togglePart(id){
+  document.getElementById(id).classList.toggle('collapsed');
+  document.getElementById('btn-'+id).classList.toggle('collapsed');
+}
+
+// 2) 복사 박스에 복사 버튼 (라벨 제외 본문만 복사)
+document.querySelectorAll('.prompt-box').forEach(box=>{
+  const b=document.createElement('button'); b.className='prompt-copy'; b.type='button'; b.textContent='📋 복사';
+  b.onclick=()=>{
+    const t=[...box.childNodes].filter(n=>n.nodeType===3).map(n=>n.textContent).join('').trim();
+    const done=()=>{ b.textContent='✓ 복사됨'; b.classList.add('copied'); setTimeout(()=>{ b.textContent='📋 복사'; b.classList.remove('copied'); },1500); };
+    if(navigator.clipboard){ navigator.clipboard.writeText(t).then(done,()=>fallback(t,done)); } else fallback(t,done);
+  };
+  box.appendChild(b);
+});
+function fallback(t,done){
+  const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select();
+  try{ document.execCommand('copy'); done(); }catch(e){} ta.remove();
+}
+
+// 3) 스크롤 등장 애니메이션
+const io=new IntersectionObserver(es=>es.forEach(e=>{
+  if(e.isIntersecting){ e.target.classList.add('reveal-in'); io.unobserve(e.target); }
+}),{threshold:.08});
+document.querySelectorAll('.content-section > *').forEach((el,i)=>{
+  el.classList.add('reveal-init'); el.style.transitionDelay=(i%6*60)+'ms'; io.observe(el);
+});
+
+// 4) 진행바 + 맨 위로 + 현재 섹션 사이드바 표시
+const links=[...document.querySelectorAll('.curriculum-item')];
+const sections=links.map(a=>document.querySelector(a.getAttribute('href')));
+addEventListener('scroll',()=>{
+  const h=document.documentElement, sc=h.scrollTop/(h.scrollHeight-h.clientHeight)*100;
+  document.getElementById('read-progress').style.width=sc+'%';
+  document.getElementById('to-top').classList.toggle('show', h.scrollTop>500);
+  let cur=0; sections.forEach((s,i)=>{ if(s && s.getBoundingClientRect().top < 160) cur=i; });
+  links.forEach((a,i)=>a.classList.toggle('active', i===cur));
+  openPartOf(links[cur]);
+},{passive:true});
+links[0].classList.add('active');
+
+// 기본교육처럼 PART는 접힌 상태로 시작하고, 지금 읽는 섹션의 PART만 펼친다
+let openPart=null;
+function openPartOf(link){
+  const box=link && link.closest('.part-content'); if(!box || box.id===openPart) return;
+  openPart=box.id;
+  document.querySelectorAll('.part-content').forEach(c=>{
+    const on=c.id===box.id;
+    c.classList.toggle('collapsed', !on);
+    document.getElementById('btn-'+c.id).classList.toggle('collapsed', !on);
+  });
+}
+
+
+// ===== FIG 1: 3층 구조 애니메이션 =====
+(function(){
+  const root = document.getElementById('fx-layers'); if (!root) return;
+  const $ = s => root.querySelector(s), $$ = s => [...root.querySelectorAll(s)];
+  const stage = $('.fx-stage'), pk = $('.fx-packet'), capP = $('.fx-cap p'), capNo = $('.fx-no'), dotsEl = $('.fx-dots');
+  const node = n => $(`.fx-node[data-n="${n}"]`), chip = c => $(`[data-c="${c}"]`);
+  // 버튼을 눌렀을 때만 움직이는 그림이라, Windows '애니메이션 줄이기' 설정과 관계없이 재생한다
+  const RM = false;
+  const KPI = { total: 934, rate: 97.4, lead: 3.2, nps: 40.0 };
+  const BARS = [-33.1, 42.2, 48.3, 51.6, 52.2, 57.6, 64.4];   // 제품별 NPS (첫 번째 = 가장 낮음)
+  const USED_COLS = [3, 6, 7, 8];                              // 제품·상태·소요일·점수 컬럼만 읽음
+
+  const grid = $('.fx-grid'); for (let i = 0; i < 9 * 10; i++) grid.appendChild(document.createElement('i'));
+  const cells = [...grid.children];
+  const barsEl = $('.fx-bars'); BARS.forEach((v, i) => { const b = document.createElement('i'); if (i === 0) b.className = 'low'; barsEl.appendChild(b); });
+
+  let mode = 'normal', step = 0, token = 0, busy = false;
+  const wait = ms => new Promise(r => setTimeout(r, RM ? Math.min(ms, 120) : ms));
+  const log = (t, cls) => { const d = document.createElement('div'); if (cls) d.className = cls; d.textContent = t; const L = $('.fx-log'); L.appendChild(d); while (L.children.length > 7) L.firstChild.remove(); };
+  const act = (...ns) => $$('.fx-node').forEach(n => n.classList.toggle('act', ns.includes(n.dataset.n)));
+  const vis = (c, on) => { chip(c).hidden = !on; };
+  const pulse = c => { const e = chip(c); e.classList.remove('pulse'); void e.offsetWidth; e.classList.add('pulse'); };
+
+  async function fly(fromEl, toEl, text, cls, dur = 1150) {
+    pk.textContent = text; pk.className = 'fx-packet ' + cls;
+    const s = stage.getBoundingClientRect(), a = fromEl.getBoundingClientRect(), b = toEl.getBoundingClientRect();
+    const pw = pk.offsetWidth, ph = pk.offsetHeight;
+    const ax = a.left + a.width / 2, ay = a.top + a.height / 2, bx = b.left + b.width / 2, by = b.top + b.height / 2;
+    let x0, y0, x1, y1;
+    if (Math.abs(bx - ax) > Math.abs(by - ay)) {          // 가로 배치: 마주 보는 테두리 사이를 이동
+      const y = Math.min(a.top + a.height * 0.5, b.top + b.height * 0.5) - s.top - ph / 2;
+      x0 = ax - s.left - pw / 2; x1 = bx - s.left - pw / 2; y0 = y1 = y;
+    } else {                                               // 세로 배치(모바일)
+      const x = Math.max(8, Math.min(ax - s.left - pw / 2, s.width - pw - 8));
+      y0 = ay - s.top - ph / 2; y1 = by - s.top - ph / 2; x0 = x1 = x;
+    }
+    const anim = pk.animate([
+      { transform: `translate(${x0}px,${y0}px) scale(.85)`, opacity: 0 },
+      { opacity: 1, offset: .12 }, { opacity: 1, offset: .88 },
+      { transform: `translate(${x1}px,${y1}px) scale(1)`, opacity: 0 }
+    ], { duration: RM ? 1 : dur, easing: 'cubic-bezier(.45,.05,.35,1)', fill: 'forwards' });
+    await anim.finished;
+  }
+  function countUp(key, to, dec, suffix) {
+    const el = $(`[data-k="${key}"]`), t0 = performance.now(), D = RM ? 1 : 700;
+    (function tick(t) { const p = Math.min(1, (t - t0) / D), v = to * (1 - Math.pow(1 - p, 3));
+      el.textContent = (dec ? v.toFixed(dec) : Math.round(v).toLocaleString('ko-KR')) + suffix;
+      if (p < 1) requestAnimationFrame(tick); else { el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); } })(t0);
+  }
+  function paint(instant) {
+    if (instant) {
+      const set = (k, v) => $(`[data-k="${k}"]`).textContent = v;
+      set('total', KPI.total.toLocaleString('ko-KR') + '건'); set('rate', KPI.rate.toFixed(1) + '%'); set('lead', KPI.lead.toFixed(1) + '일'); set('nps', KPI.nps.toFixed(1));
+    } else { countUp('total', KPI.total, 0, '건'); countUp('rate', KPI.rate, 1, '%'); countUp('lead', KPI.lead, 1, '일'); countUp('nps', KPI.nps, 1, ''); }
+    const max = Math.max(...BARS.map(Math.abs));
+    [...barsEl.children].forEach((b, i) => b.style.height = (Math.max(10, Math.abs(BARS[i]) / max * 100)) + '%');
+  }
+  async function scan(t) {
+    chip('scan').textContent = '필요한 4개 컬럼만 읽는 중…';
+    for (let r = 0; r < 10; r++) {
+      if (t !== token) return;
+      for (let c = 0; c < 9; c++) cells[r * 9 + c].className = USED_COLS.includes(c) ? 'hit' : 'skip';
+      await wait(85);
+    }
+    chip('scan').textContent = '집계 완료 → 숫자 12개';
+  }
+
+  const MODES = {
+    normal: {
+      intro: '▶ 재생을 누르면 대시보드를 열 때 세 부분 사이의 처리 순서를 단계별로 보여줍니다.',
+      steps: [
+        { cap: '사용자가 대시보드를 엽니다. 화면 코드에는 <b>데이터가 없고</b>, 백엔드에 요약값을 요청합니다.',
+          run: async () => { act('front'); await wait(400); await fly(node('front'), node('back'), '📨 GET /api/summary', 'req'); log('GET /api/summary?from=19&to=25'); } },
+        { cap: '백엔드가 먼저 캐시를 확인합니다. 저장된 결과가 없으므로 <b>백엔드에 보관된 키</b>로 BigQuery에 인증합니다.',
+          run: async () => { act('back'); log('캐시 확인 → 없음', 'dim'); await wait(500); pulse('b-key'); log('🔑 서비스 계정으로 인증', 'y'); await wait(900); } },
+        { cap: '필요한 컬럼만 사용하는 <b>집계 SQL</b>을 저장소에 보냅니다. 키와 계산식은 백엔드 밖으로 나가지 않습니다.',
+          run: async () => { await fly(node('back'), node('data'), '🔑 인증 + SQL(집계)', 'sql'); log('SQL 실행 요청 → BigQuery'); } },
+        { cap: '저장소가 1,000행 중 <b>필요한 4개 컬럼만</b> 읽어 합계·평균을 계산합니다. 원본 행은 저장소에 남습니다.',
+          run: async t => { act('data'); await scan(t); await wait(500); } },
+        { cap: '저장소는 <b>집계 결과 12개</b>만 돌려줍니다. 백엔드는 다음 요청에 대비해 결과를 <b>캐시</b>에 저장합니다.',
+          run: async () => { await fly(node('data'), node('back'), '🔢 집계 결과 12개', 'res'); act('back'); log('결과 12개 수신 · 스캔 0.02MB', 'ok');
+            const c = chip('b-cache'); c.textContent = '🗃 캐시: 방금 저장 (5분)'; c.className = 'fx-chip good'; pulse('b-cache'); await wait(600); } },
+        { cap: '백엔드가 작은 JSON(약 2KB)을 돌려주고, 화면은 <b>받은 숫자로 차트를 그립니다.</b>',
+          run: async () => { await fly(node('back'), node('front'), '📦 JSON 약 2KB', 'res'); act('front'); log('200 OK → 화면으로 응답', 'ok'); paint(); vis('f-nums', true); pulse('f-nums'); await wait(900); } },
+        { cap: '<b>정리:</b> 화면은 집계값, 백엔드는 키와 계산식, 저장소는 원본을 가집니다. 새로고침하면 1단계부터 다시 실행되므로 <b>최신 데이터</b>가 표시됩니다.',
+          run: async () => { act('front', 'back', 'data'); ['f-nums', 'b-key', 'd-rows'].forEach(pulse); await wait(600); } },
+      ]
+    },
+    cache: {
+      intro: '같은 화면을 5분 안에 다시 여는 경우입니다. 첫 조회 결과가 백엔드 캐시에 남아 있는 상태에서 시작합니다.',
+      setup: () => { paint(true); vis('f-nums', true); const c = chip('b-cache'); c.textContent = '🗃 캐시: 32초 전 결과'; c.className = 'fx-chip good';
+        log('GET /api/summary?from=19&to=25', 'dim'); log('SQL 실행 → 결과 12개 저장', 'dim'); chip('scan').textContent = '32초 전 집계'; },
+      steps: [
+        { cap: '다른 사용자가 같은 대시보드를 엽니다. 화면은 동일하게 백엔드에 요청을 보냅니다.',
+          run: async () => { act('front'); await wait(300); await fly(node('front'), node('back'), '📨 GET /api/summary', 'req'); log('GET /api/summary?from=19&to=25'); } },
+        { cap: '캐시에 <b>32초 전 집계 결과</b>가 있으므로 BigQuery를 <b>다시 조회하지 않습니다.</b>',
+          run: async () => { act('back'); pulse('b-cache'); log('캐시 적중 (32초 전 결과)', 'ok'); node('data').classList.add('dim', 'sleep'); await wait(1100); } },
+        { cap: '저장된 결과를 바로 돌려줍니다. <b>조회 비용이 발생하지 않고</b> 응답도 빠릅니다.',
+          run: async () => { await fly(node('back'), node('front'), '⚡ 캐시된 JSON', 'res', 650); act('front'); log('200 OK (3ms)', 'ok'); paint(); await wait(700); } },
+        { cap: '단, 캐시 유지 시간(5분) 동안 새로 들어온 데이터는 바로 반영되지 않습니다. 이 때문에 화면에 <b>조회 시각과 캐시 여부</b>를 표시합니다(2-7 참고).',
+          run: async () => { act('back'); await wait(400); } },
+      ]
+    },
+    direct: {
+      intro: '백엔드 없이 화면이 BigQuery에 직접 접속하는 경우입니다.',
+      setup: () => { vis('f-key', false); },
+      steps: [
+        { cap: '백엔드가 없으면 화면이 저장소에 인증하기 위해 <b>키를 HTML 코드에 넣어야</b> 합니다.',
+          run: async () => { act('front'); vis('f-key', true); pulse('f-key'); await wait(1100); } },
+        { cap: '화면이 키를 들고 저장소에 <b>직접</b> 요청합니다.',
+          run: async () => { await fly(node('front'), node('data'), '🔑 키 + SQL', 'sql', 1400); act('data'); } },
+        { cap: '집계할 백엔드가 없으므로 <b>원본 행 전체</b>를 받아 화면에서 계산합니다. 1,000행은 약 80KB지만 10만 행이면 수십 MB가 됩니다.',
+          run: async t => { await scan(t); chip('scan').textContent = '전체 행을 화면으로 내보냄'; cells.forEach(c => c.className = 'hit');
+            await fly(node('data'), node('front'), '📚 원본 1,000행', 'raw', 1500); act('front'); vis('f-rows', true); pulse('f-rows'); paint(); await wait(500); } },
+        { cap: '이 HTML 파일을 메일이나 메신저로 받은 사람은 F12(개발자 도구)로 <b>키와 원본 데이터를 확인</b>할 수 있습니다. 키가 유출된 것과 같습니다.',
+          run: async () => { const th = $('.fx-thief'); th.hidden = false; await wait(300);
+            await fly(chip('f-key'), th, '🔑', 'key', 900); chip('t-key').textContent = '🔑'; await wait(700); } },
+        { cap: '<b>키는 반드시 백엔드에만 둡니다.</b> 화면은 집계값만 받고, 원본과 키는 사내 서버와 GCP 안에 둡니다. 백엔드가 필요한 가장 큰 이유입니다.',
+          run: async () => { act(); await wait(300); } },
+      ]
+    }
+  };
+
+  function renderCap(html) {
+    const M = MODES[mode];
+    capNo.textContent = `${step} / ${M.steps.length}`;
+    capP.innerHTML = html;
+    dotsEl.innerHTML = M.steps.map((_, i) => `<i class="${i < step ? 'on' : ''}"></i>`).join('');
+    const done = step >= M.steps.length;
+    $('[data-a="play"]').textContent = done ? '↺ 다시 보기' : (step ? '▶ 이어서 재생' : '▶ 재생');
+    $('[data-a="step"]').disabled = done || busy;
+    $('[data-a="play"]').disabled = busy;
+  }
+  function reset() {
+    token++; busy = false; step = 0;
+    pk.getAnimations().forEach(a => a.cancel());
+    root.classList.toggle('direct', mode === 'direct');
+    act(); $$('.fx-node').forEach(n => n.classList.remove('dim', 'sleep'));
+    $('.fx-log').innerHTML = ''; log('$ python server.py', 'dim'); log('대기 중 · http://127.0.0.1:8940', 'dim');
+    $$('[data-k]').forEach(e => e.textContent = '–'); [...barsEl.children].forEach(b => b.style.height = '0');
+    cells.forEach(c => c.className = ''); chip('scan').textContent = '대기';
+    vis('f-key', false); vis('f-nums', false); vis('f-rows', false);
+    const c = chip('b-cache'); c.textContent = '🗃 캐시: 비어 있음'; c.className = 'fx-chip';
+    $('.fx-thief').hidden = true; chip('t-key').textContent = '';
+    $$('.fx-modes button').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
+    if (MODES[mode].setup) MODES[mode].setup();
+    renderCap(MODES[mode].intro);
+  }
+  async function runStep() {
+    const M = MODES[mode]; if (busy || step >= M.steps.length) return false;
+    const t = token, st = M.steps[step];
+    busy = true; capNo.textContent = `${step + 1} / ${M.steps.length}`; capP.innerHTML = st.cap; renderCapButtons();
+    await st.run(t);
+    if (t !== token) return false;
+    busy = false; step++; renderCap(st.cap); return true;
+  }
+  function renderCapButtons() { $('[data-a="step"]').disabled = true; $('[data-a="play"]').disabled = true;
+    dotsEl.innerHTML = MODES[mode].steps.map((_, i) => `<i class="${i <= step ? 'on' : ''}"></i>`).join(''); }
+  async function play() {
+    if (step >= MODES[mode].steps.length) reset();
+    const t = token;
+    while (t === token && step < MODES[mode].steps.length) {
+      if (!(await runStep())) return;
+      if (step < MODES[mode].steps.length) await wait(1700);
+    }
+  }
+  $('[data-a="play"]').onclick = play;
+  $('[data-a="step"]').onclick = runStep;
+  $('[data-a="reset"]').onclick = reset;
+  $$('.fx-modes button').forEach(b => b.onclick = () => { mode = b.dataset.mode; reset(); });
+  reset();
+})();
+
+// ===== FIG 1: 고정형 vs 연동형 =====
+(function(){
+  const R = document.getElementById('fx-photo'); if (!R) return;
+  const q = s => R.querySelector(s);
+  const WEEKS = [[150,28.3],[146,36.1],[152,42.4],[139,35.2],[155,44.6],[148,39.0],[151,41.8],[143,37.5]];
+  let st;
+  const fmt = n => n.toLocaleString('ko-KR');
+  const flash = el => { el.classList.remove('flash-g'); void el.offsetWidth; el.classList.add('flash-g'); };
+  function init() { st = { week: 25, total: 1000, scored: 972, pd: 387, photo: { week: 25, total: 1000, nps: 39.8 }, manual: 0, busy: false }; render(true); cap('현재는 고정형(MVP)과 연동형 화면의 숫자가 같습니다. <b>⏩ 1주 뒤로 감기</b>를 누르면 데이터가 추가될 때의 차이를 확인할 수 있습니다.'); }
+  const nps = () => Math.round(st.pd / st.scored * 1000) / 10;
+  function cap(html) { q('.fx-no').textContent = st.week + '주차'; q('.fx-cap p').innerHTML = html; }
+  function render(first) {
+    q('[data-w="week"]').textContent = st.week + '주차'; q('[data-w="total"]').textContent = fmt(st.total); q('[data-w="nps"]').textContent = nps().toFixed(1);
+    q('[data-p="total"]').textContent = fmt(st.photo.total) + '건'; q('[data-p="nps"]').textContent = st.photo.nps.toFixed(1);
+    q('[data-p="manual"]').textContent = st.manual;
+    const lag = st.week - st.photo.week, ps = q('[data-p="stamp"]');
+    ps.textContent = lag ? `${st.photo.week}주차 데이터 · ${lag}주 전 기준` : `${st.photo.week}주차 데이터 · 최신`;
+    ps.className = 'ph-stamp' + (lag ? ' old' : ''); q('.ph-card.photo').classList.toggle('stale', lag > 0);
+    if (first) { q('[data-v="total"]').textContent = fmt(st.total) + '건'; q('[data-v="nps"]').textContent = nps().toFixed(1); q('[data-v="stamp"]').textContent = `방금 조회 · ${st.week}주차까지`; q('.ph-new').hidden = true; }
+    q('[data-a="next"]').disabled = st.busy || st.week >= 25 + WEEKS.length;
+    q('[data-a="paste"]').disabled = st.busy || lag === 0;
+  }
+  async function next() {
+    if (st.busy) return; const w = WEEKS[st.week - 25]; if (!w) return;
+    st.busy = true; st.week++; st.total += w[0]; const sc = Math.round(w[0] * .97); st.scored += sc; st.pd += Math.round(sc * w[1] / 100);
+    render(); const nb = q('.ph-new'); nb.textContent = `+${w[0]}건 새로 들어옴`; nb.hidden = false; flash(q('[data-w="total"]'));
+    const vs = q('[data-v="stamp"]'); vs.textContent = '조회 중…'; vs.className = 'ph-stamp loading';
+    await new Promise(r => setTimeout(r, 650));
+    q('[data-v="total"]').textContent = fmt(st.total) + '건'; q('[data-v="nps"]').textContent = nps().toFixed(1);
+    flash(q('[data-v="total"]')); flash(q('[data-v="nps"]')); vs.textContent = `방금 조회 · ${st.week}주차까지`; vs.className = 'ph-stamp';
+    st.busy = false; render();
+    const lag = st.week - st.photo.week;
+    if (lag === 1) cap(`1주 동안 저장소에 <b>${w[0]}건</b>이 추가됐습니다. 연동형은 화면을 열 때 다시 조회하므로 <b>자동으로 반영</b>되고, 고정형은 이전 값을 그대로 보여줍니다.`);
+    else if (lag < 4) cap(`고정형 화면은 <b>${lag}주 전 데이터</b>를 보여주고 있습니다. 이 화면으로 회의하면 ${lag}주 전 숫자를 현재 값으로 오해할 수 있습니다. 최신으로 바꾸려면 <b>📋 버튼</b>(CSV 재첨부)이 필요합니다.`);
+    else cap(`<b>${lag}주</b> 차이가 났습니다. 고정형으로 매주 최신 상태를 유지하려면 <b>연 52회</b> 다시 만들어야 하고, 연동형은 추가 작업이 없습니다.`);
+  }
+  function paste() {
+    if (st.busy) return; st.manual++; st.photo = { week: st.week, total: st.total, nps: nps() }; render();
+    flash(q('[data-p="total"]')); flash(q('[data-p="nps"]'));
+    q('[data-p="stamp"]').textContent = `${st.week}주차 데이터 · 최신 (수동 갱신)`;
+    cap(`고정형 화면을 갱신하려면 <b>CSV를 다시 첨부해 새로 만들어야</b> 합니다(현재 ${st.manual}회). 매주 갱신하면 연 52회이고, 데이터가 커지면 첨부 용량 제한에 걸립니다.`);
+  }
+  q('[data-a="next"]').onclick = next; q('[data-a="paste"]').onclick = paste; q('[data-a="reset"]').onclick = init;
+  init();
+})();
+
+// ===== FIG 3: 데이터 파이프라인 =====
+(function(){
+  const R = document.getElementById('fx-pipe'); if (!R) return;
+  const q = s => R.querySelector(s), view = q('.pp-view'), stages = [...R.querySelectorAll('.pp-stages .stage')];
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const COLS = ['접수번호', '고객명', '연락처', '주소', '제품', '불량 유형', '상태', '소요일', 'NPS'], PII = [1, 2, 3];
+  const ROWS = [['CS270001', '김○○', '010-****-1234', '서울 ○○구 ○○로 …', '휘센 에어컨', '소음/진동', '완료', '5', '9'],
+                ['CS270002', '이○○', '010-****-5678', '경기 ○○시 ○○동 …', '디오스 냉장고', '소음/진동', '완료', '1', '10'],
+                ['CS270003', '박○○', '010-****-9012', '부산 ○○구 ○○길 …', '그램 노트북', '키보드 일부 안눌림', '진행중', '', '']];
+  const table = () => `<div class="pp-wrap"><table class="pp-table"><tr>${COLS.map((c, i) => `<th class="${PII.includes(i) ? 'pii' : ''}"><div>${c}</div></th>`).join('')}</tr>` +
+    ROWS.map(r => `<tr>${r.map((v, i) => `<td class="${PII.includes(i) ? 'pii' : ''}"><div>${v || '—'}</div></td>`).join('')}</tr>`).join('') + `</table></div>`;
+  let step = 0, token = 0, busy = false;
+
+  const STEPS = [
+    { cap: '고객이 서비스를 접수하면 <b>원천 시스템</b>에 한 건이 기록됩니다. 여기에는 고객명·연락처·주소 같은 <b>개인정보가 포함</b>되어 있습니다.',
+      run: async () => { view.innerHTML = `<div class="pp-scene"><div class="pp-label">STEP 1 · 원천 시스템의 접수 데이터</div>${table()}
+        <div class="pp-badges"><span class="fx-chip bad">🔴 개인정보 컬럼 3개 포함</span><span class="fx-chip">사내 업무 시스템 안에만 존재</span><span class="fx-chip key">🔒 사용 전 필수: 프라이버시센터 영향평가 → 약관포털 적법성평가</span></div></div>`; await wait(600); } },
+    { cap: '(영향평가·적법성평가를 마친 뒤) <b>EAP</b>가 정해진 시각(대부분 근무시간 전 새벽 일배치)에 필요한 컬럼만 추출하고, <b>개인정보 컬럼을 제외</b>합니다. 이후 단계에는 개인정보가 포함되지 않습니다.',
+      run: async t => { view.innerHTML = `<div class="pp-scene"><div class="pp-label">STEP 2 · EAP 추출·비식별</div>${table()}
+        <div class="pp-badges"><span class="fx-chip key">🧹 비식별 처리 중…</span></div></div>`;
+        await wait(700); if (t !== token) return; view.querySelectorAll('.pii').forEach(e => e.classList.add('cut'));
+        await wait(800); if (t !== token) return; view.querySelectorAll('.pii').forEach(e => e.classList.add('gone'));
+        await wait(900); if (t !== token) return;
+        view.querySelector('.pp-badges').innerHTML = '<span class="fx-chip good">✅ 개인정보 3개 컬럼 제외</span><span class="fx-chip">필요한 6개 컬럼만</span><span class="fx-chip">⏰ 새벽 일배치</span>'; } },
+    { cap: '비식별 데이터가 <b>BigQuery 테이블</b>에 적재됩니다. 이후 원본 데이터는 <b>저장소에 보관</b>되며 외부로 전체가 반출되지 않습니다.',
+      run: async t => { view.innerHTML = `<div class="pp-scene"><div class="pp-label">STEP 3 · BigQuery (pjt-lge-edl-user › 내 사번 데이터셋 › 뷰)</div>
+        <div class="pp-row"><div class="pp-stack"></div><div><div class="pp-big"><span data-n>0</span><small>행 적재</small></div>
+        <div class="pp-badges"><span class="fx-chip good">🛡 개인정보 컬럼 없음</span><span class="fx-chip">마지막 적재 06:20</span></div></div></div></div>`;
+        const stack = view.querySelector('.pp-stack'), num = view.querySelector('[data-n]');
+        for (let i = 1; i <= 25; i++) { if (t !== token) return; const b = document.createElement('i'); b.style.width = (60 + (i * 37) % 40) + '%'; stack.appendChild(b);
+          num.textContent = (i * 40).toLocaleString('ko-KR'); await wait(55); } } },
+    { cap: '대시보드를 열면 <b>백엔드</b>가 조회 전용 키로 쿼리해 1,000행을 <b>집계값 12개</b>(KPI 4 + 제품별 NPS 7 + 기준일 1)로 줄입니다. 화면에는 이 집계값만 전달됩니다.',
+      run: async t => { view.innerHTML = `<div class="pp-scene"><div class="pp-label">STEP 4 · 백엔드 집계 (원본 1,000행 → 숫자 12개, 약 2KB)</div>
+        <div class="pp-row"><div class="pp-big">1,000<small>행</small></div><div class="pp-arrow">➜</div><div class="pp-nums"></div></div></div>`;
+        const box = view.querySelector('.pp-nums');
+        const NUMS = ['총 접수 934', '완료율 97.4%', '평균 3.2일', 'NPS 40.0', '휘센 −33.1', '프라엘 42.2', '그램 48.3', '디오스 51.6', '오브제 52.2', '트롬 57.6', '올레드 64.4', '기준일 06-15'];
+        for (const n of NUMS) { if (t !== token) return; const e = document.createElement('span'); e.textContent = n; box.appendChild(e); await wait(130); } } },
+    { cap: '<b>대시보드</b>는 받은 집계값으로 차트를 그립니다. 다음 날 새벽 배치로 새 데이터가 적재되면 <b>같은 과정</b>이 자동으로 반복되어 화면이 갱신됩니다.',
+      run: async () => { view.innerHTML = `<div class="pp-scene"><div class="pp-label">STEP 5 · 대시보드 화면</div><div class="pp-row"><div class="pp-mini">
+        <div class="fx-kpis" style="grid-template-columns:repeat(4,1fr)"><div><small>총 접수</small><b>934건</b></div><div><small>완료율</small><b>97.4%</b></div><div><small>평균 처리</small><b>3.2일</b></div><div><small>NPS</small><b>40.0</b></div></div>
+        <div class="fx-bars">${[33.1, 42.2, 48.3, 51.6, 52.2, 57.6, 64.4].map((v, i) => `<i class="${i ? '' : 'low'}" data-h="${v / 64.4 * 100}"></i>`).join('')}</div></div>
+        <div class="pp-badges" style="margin:0"><span class="fx-chip">데이터 기준일 06-15</span><span class="fx-chip good">🔁 매일 자동 갱신</span></div></div></div>`;
+        await wait(60); view.querySelectorAll('.fx-bars i').forEach(b => b.style.height = b.dataset.h + '%'); await wait(900); } },
+  ];
+
+  function ui() {
+    q('.fx-no').textContent = `${step} / ${STEPS.length}`;
+    q('.fx-dots').innerHTML = STEPS.map((_, i) => `<i class="${i < step || (busy && i === step) ? 'on' : ''}"></i>`).join('');
+    const done = step >= STEPS.length;
+    q('[data-a="play"]').textContent = done ? '↺ 다시 보기' : (step ? '▶ 이어서 재생' : '▶ 재생');
+    q('[data-a="play"]').disabled = busy; q('[data-a="step"]').disabled = busy || done;
+  }
+  function reset() {
+    token++; busy = false; step = 0; R.classList.remove('running'); stages.forEach(e => e.classList.remove('on', 'past'));
+    view.innerHTML = '<div class="pp-label">데이터 미리보기</div><p class="text-sm text-muted" style="margin:0">단계별 데이터 형태가 여기에 표시됩니다.</p>';
+    q('.fx-cap p').innerHTML = '▶ 재생을 누르면 접수 데이터가 원천 시스템에서 대시보드까지 <b>5단계</b>를 거치는 과정과 단계별 데이터 형태를 보여줍니다.';
+    ui();
+  }
+  async function runStep() {
+    if (busy || step >= STEPS.length) return false;
+    const t = token; busy = true; R.classList.add('running');
+    stages.forEach((e, i) => { e.classList.toggle('on', i === step); e.classList.toggle('past', i < step); });
+    q('.fx-cap p').innerHTML = STEPS[step].cap; ui(); q('.fx-no').textContent = `${step + 1} / ${STEPS.length}`;
+    await STEPS[step].run(t); if (t !== token) return false;
+    busy = false; step++; ui(); return true;
+  }
+  async function play() {
+    if (step >= STEPS.length) reset();
+    const t = token;
+    while (t === token && step < STEPS.length) { if (!(await runStep())) return; if (step < STEPS.length) await wait(1800); }
+  }
+  q('[data-a="play"]').onclick = play; q('[data-a="step"]').onclick = runStep; q('[data-a="reset"]').onclick = reset;
+  reset();
+})();
+
+// ===== FIG 4: NPS 분모 =====
+(function(){
+  const R = document.getElementById('fx-nps'); if (!R) return;
+  const q = s => R.querySelector(s);
+  const M = {
+    scored: { den: 910, res: 40.0, w: 97.43, cap: '진행중 24건은 아직 점수가 없으니 <b>분모에서 뺍니다.</b> (501 − 137) ÷ 910 × 100 = <b>40.0</b>. 시연키트 백엔드는 <code class="i">COUNT(nps_score)</code>로 이 기준을 적용합니다.' },
+    all:    { den: 934, res: 39.0, w: 100,   cap: '진행중 24건까지 분모에 포함하면 점수가 없는 건이 계산에 들어가 <b>39.0</b>이 됩니다. 같은 데이터에서 <b>1.0점 차이</b>가 나므로, 화면마다 계산 기준이 다르면 수치가 맞지 않습니다.' },
+  };
+  let cur = null;
+  function set(m) {
+    const from = cur ? M[cur].res : M[m].res, to = M[m].res; cur = m;
+    R.classList.toggle('all', m === 'all');
+    R.querySelectorAll('.fx-modes button').forEach(b => b.classList.toggle('on', b.dataset.m === m));
+    q('.nps-den .br').style.width = M[m].w + '%'; q('.nps-den .lb').style.left = (M[m].w / 2) + '%';
+    q('.nps-den .lb').textContent = `분모 ${M[m].den}건`; q('.t.den').textContent = M[m].den;
+    q('.fx-no').textContent = m === 'all' ? '주의' : '정의'; q('.fx-cap p').innerHTML = M[m].cap;
+    const el = q('.nps-res'), t0 = performance.now();
+    (function tick(t) { const p = Math.min(1, (t - t0) / 600); el.textContent = (from + (to - from) * p).toFixed(1); if (p < 1) requestAnimationFrame(tick); })(t0);
+  }
+  R.querySelectorAll('.fx-modes button').forEach(b => b.onclick = () => set(b.dataset.m));
+  set('scored');
+})();
+
+// ===== FIG 3: API 요청 시뮬레이터 =====
+(function(){
+  const R = document.getElementById('fx-api'); if (!R) return;
+  const q = s => R.querySelector(s);
+  // 주차별 원자료: [접수, 완료, 소요일 합, 소요일 건수, 점수 건수, 추천, 비추천]
+  const W = {18:[66,62,194,62,62,38,15],19:[149,145,480,145,145,69,22],20:[156,155,517,155,155,81,28],21:[150,145,478,145,145,82,19],
+             22:[154,147,450,147,147,80,25],23:[141,134,426,134,134,82,19],24:[158,158,493,158,158,90,23],25:[26,26,81,26,26,17,1]};
+  let auth = true, busy = false;
+  const fSel = q('[data-p="from"]'), tSel = q('[data-p="to"]');
+  for (let w = 18; w <= 25; w++) { fSel.add(new Option(w, w)); tSel.add(new Option(w, w)); }
+  fSel.value = 19; tSel.value = 25;
+  const esc = t => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  function wire() {
+    const f = fSel.value, t = tSel.value;
+    q('.api-wire').innerHTML = `<span class="m">GET</span> /api/summary<span class="q">?from=${f}&amp;to=${t}</span> HTTP/1.1\n<span class="h">Host: 127.0.0.1:8940\nAccept: application/json</span>` +
+      (auth ? `\n<span class="h">Authorization:</span> <span class="tok">Bearer eyJhbGciOiJIUzI1NiJ9.••••••</span>` : `\n<span class="h">(인증 헤더 없음)</span>`);
+  }
+  function cap(h) { q('.fx-cap p').innerHTML = h; }
+  function json(o) {
+    return esc(JSON.stringify(o, null, 2)).replace(/"([^"]+)":/g, '<span class="k">"$1"</span>:').replace(/: (-?[\d.]+)/g, ': <span class="n">$1</span>').replace(/: "([^"]*)"/g, ': <span class="v">"$1"</span>');
+  }
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  async function send() {
+    if (busy) return; busy = true; q('.api-send').disabled = true;
+    const flows = [...R.querySelectorAll('.api-flow span')]; flows.forEach(e => e.className = '');
+    const st = q('.api-status'); st.className = 'api-status'; st.textContent = '전송 중…'; q('.api-meta').textContent = '';
+    R.querySelectorAll('[data-k]').forEach(e => e.textContent = '–');
+    const f = +fSel.value, t = +tSel.value, t0 = performance.now();
+    flows[0].className = 'on'; await wait(500); flows[0].className = 'done';
+    let code, body, text;
+    if (!auth) { code = 401; body = { error: '인증 토큰이 없거나 만료되었습니다' }; }
+    else if (f > t) { code = 400; body = { error: 'from 은 to 보다 클 수 없습니다', from: f, to: t }; }
+    else {
+      flows[1].className = 'on'; await wait(650); flows[1].className = 'done'; code = 200;
+      const S = [0,0,0,0,0,0,0], by = [];
+      for (let w = f; w <= t; w++) { const d = W[w]; d.forEach((v, i) => S[i] += v); by.push({ week: w, cnt: d[0], nps: Math.round((d[5] - d[6]) / d[4] * 1000) / 10 }); }
+      body = { kpi: { total: S[0], done: S[1], avg_lead_time: Math.round(S[2] / S[3] * 10) / 10, nps: Math.round((S[5] - S[6]) / S[4] * 1000) / 10 },
+               by_week: by.length > 3 ? [...by.slice(0, 2), '…', by[by.length - 1]] : by,
+               meta: { source: 'bigquery', queried_at: '2026-10-19 09:00:12', cached: false } };
+    }
+    flows[2].className = 'on'; await wait(450); flows[2].className = 'done';
+    const raw = JSON.stringify(body); text = { 200: '200 OK', 400: '400 Bad Request', 401: '401 Unauthorized' }[code];
+    st.textContent = text; st.className = 'api-status ' + (code === 200 ? 'ok' : 'ng');
+    q('.api-meta').textContent = `${Math.round(performance.now() - t0)}ms · ${new Blob([raw]).size.toLocaleString()} bytes`;
+    q('.api-body').innerHTML = json(body).replace('"…"', '… (중간 생략)');
+    if (code === 200) {
+      const k = body.kpi; const set = (n, v) => R.querySelector(`[data-k="${n}"]`).textContent = v;
+      set('total', k.total.toLocaleString('ko-KR') + '건'); set('rate', (k.done / k.total * 100).toFixed(1) + '%'); set('lead', k.avg_lead_time.toFixed(1) + '일'); set('nps', k.nps.toFixed(1));
+      const weeks = t - f + 1;
+      cap(`<b>200 OK.</b> ${f}~${t}주차(${weeks}주) 원본 <b>${k.total.toLocaleString('ko-KR')}건</b>을 서버가 집계해 <b>약 ${new Blob([raw]).size}바이트의 결과</b>만 돌려줬습니다. 같은 주소에 조건(from·to)만 바꿔 요청하면 해당 조건의 결과를 받습니다.`);
+    } else if (code === 401) {
+      cap('<b>401 Unauthorized.</b> 인증 정보가 없어 요청이 거부됐습니다. 사내 API는 토큰(API 키)을 헤더에 포함해야 하며, 토큰이 만료돼도 같은 오류가 발생합니다. 토큰은 화면이 아니라 <b>백엔드의 .env</b>에 둡니다.');
+    } else {
+      cap('<b>400 Bad Request.</b> 명세와 맞지 않는 요청입니다. from이 to보다 클 수 없다는 규칙에 따라 서버가 거부했습니다. 오류 메시지를 확인하고 <b>조건을 수정</b>해 다시 요청합니다.');
+    }
+    busy = false; q('.api-send').disabled = false;
+  }
+  R.querySelectorAll('.api-auth button').forEach(b => b.onclick = () => { auth = b.dataset.auth === 'on';
+    R.querySelectorAll('.api-auth button').forEach(x => x.classList.toggle('on', x === b)); wire(); });
+  fSel.onchange = tSel.onchange = wire;
+  q('.api-send').onclick = send;
+  wire();
+  cap('조건(from·to)과 인증 여부를 선택한 뒤 <b>📨 요청 보내기</b>를 누릅니다. 검은 영역은 <b>실제로 전송되는 요청</b>입니다. 인증을 "없음"으로 바꾸거나 from을 to보다 크게 설정하면 오류 응답을 확인할 수 있습니다.');
+})();
+
+// ===== FIG 4: 상황 카드 =====
+document.querySelectorAll('#fx-cases .case').forEach(c => c.onclick = () => c.classList.toggle('open'));
+
+// ===== FIG 6: 배치 하루 시계 =====
+(function(){
+  const R = document.getElementById('fx-batch'); if (!R) return;
+  const q = s => R.querySelector(s), v = k => R.querySelector(`[data-v="${k}"]`);
+  const B0 = 360, B1 = 380, YDAY = 128, TODAY = 131;     // 배치 06:00~06:20 (예시), 어제·오늘 접수 건수(예시)
+  const range = q('.bt-range'), hand = q('.bt-hand'), panels = p => R.querySelector(`[data-p="${p}"]`);
+  const hhmm = t => String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0');
+  const todayCnt = t => t < 480 ? Math.round(TODAY * 0.02 * t / 480) : Math.round(TODAY * (0.02 + 0.98 * Math.min(1, (t - 480) / 720)));
+  let timer = null;
+  function render(t) {
+    range.value = t; hand.style.left = (t / 1440 * 100) + '%'; hand.querySelector('b').textContent = hhmm(t);
+    q('.fx-no').textContent = hhmm(t);
+    const n = todayCnt(t); v('today').textContent = n; v('yday').textContent = YDAY;
+    const badge = v('badge'), prog = v('prog');
+    let cap, act;
+    if (t < B0) {
+      badge.className = 'bt-badge wait'; badge.textContent = '대기 (다음 배치 06:00)'; prog.style.width = '0';
+      v('load').textContent = '어제 06:20'; v('basis').textContent = 'D-2'; v('dashnote').textContent = '그제 접수분까지 (어제 아침 배치 기준)';
+      v('gap').textContent = `어제 접수 ${YDAY}건은 배치 대기 중`; act = ['src'];
+      cap = '새벽 시간대입니다. 저장소에는 <b>전날 아침 배치</b>까지의 데이터(그제 접수분까지)가 있고, 어제 접수된 VOC는 원천 시스템에서 오늘 배치를 기다립니다.';
+    } else if (t < B1) {
+      const p = (t - B0) / (B1 - B0);
+      badge.className = 'bt-badge run'; badge.textContent = `⚙ 배치 실행 중 ${Math.round(p * 100)}%`; prog.style.width = (p * 100) + '%';
+      v('load').textContent = '어제 06:20 → 갱신 중'; v('basis').textContent = 'D-2'; v('dashnote').textContent = '배치 완료 후 갱신';
+      v('gap').textContent = ''; act = ['src', 'bq'];
+      cap = '<b>근무시간 전 EAP 일배치가 실행됩니다.</b> 어제 접수분을 모아 개인정보를 제외하고 BigQuery 테이블에 일괄 적재합니다. 적재 시각은 <code class="i">ETL_LOAD_TS</code>에 기록됩니다.';
+    } else {
+      badge.className = 'bt-badge done'; badge.textContent = '✅ 오늘 06:20 적재 완료'; prog.style.width = '100%';
+      v('load').textContent = '오늘 06:20'; v('basis').textContent = 'D-1'; v('dashnote').textContent = '어제 접수분까지 (오늘 아침 배치 기준)';
+      v('gap').textContent = n ? `오늘 접수 ${n}건은 내일 아침 배치 후 반영` : '';
+      if (t < 540) { act = ['bq', 'dash']; cap = '<b>배치 완료.</b> 업무 시작 전에 대시보드에 <b>전일까지의 데이터</b>가 반영됩니다. 오전 회의 전에 배치를 완료하도록 일정을 잡는 이유입니다.'; }
+      else if (t < 1080) { act = ['src', 'dash']; cap = `<b>근무시간.</b> 원천 시스템에는 오늘 VOC가 계속 접수되지만(현재 ${n}건) 대시보드 숫자는 하루 동안 유지됩니다. 오늘 접수 건은 <b>다음 날 아침 배치</b>에 반영됩니다.`; }
+      else { act = ['src']; cap = `<b>업무 종료 후.</b> 오늘 접수된 ${n}건은 다음 날 새벽 배치에서 적재됩니다. 하루 동안 오전 회의와 오후 보고 모두 <b>같은 기준(전일까지)</b>의 숫자를 사용했습니다.`; }
+    }
+    ['src', 'bq', 'dash'].forEach(p => panels(p).classList.toggle('act', act.includes(p)));
+    q('.fx-cap p').innerHTML = cap;
+  }
+  function stop() { if (timer) { clearInterval(timer); timer = null; q('.bt-jumps .play').textContent = '▶ 하루 재생'; } }
+  range.oninput = () => { stop(); render(+range.value); };
+  R.querySelectorAll('.bt-jumps [data-t]').forEach(b => b.onclick = () => { stop(); render(+b.dataset.t); });
+  q('.bt-jumps .play').onclick = function () {
+    if (timer) return stop();
+    let t = +range.value >= 1430 ? 0 : +range.value;
+    this.textContent = '⏸ 멈춤';
+    timer = setInterval(() => { t = Math.min(1439, t + (t >= B0 - 20 && t < B1 + 10 ? 2 : 8)); render(t); if (t >= 1439) stop(); }, 60);
+  };
+  render(180);
+})();
+</script>
+</body>
+</html>
